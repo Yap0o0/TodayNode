@@ -1,16 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Calendar from 'react-calendar';
 import '../components/Calendar.css'; // Import custom calendar styles
 import { Edit, Trash2 } from 'lucide-react';
 import { useHabits } from '../context/HabitContext'; // useHabits import
+import Modal from '../components/Modal';
+import MoodSelector from '../components/MoodSelector';
+import TagSelector from '../components/TagSelector';
+import { Textarea } from '../components/Textarea';
+import { Button } from '../components/Button';
 
 /**
  * 캘린더 페이지 컴포넌트입니다.
  * 날짜별 기록을 캘린더와 리스트 형태로 보여줍니다.
  */
 const CalendarPage = () => {
-  const { entries, deleteEntry } = useHabits(); // entries와 deleteEntry 함수 가져오기
+  const { entries, deleteEntry, updateEntry } = useHabits(); // updateEntry 추가
   const [selectedDate, setSelectedDate] = useState(new Date());
+
+  // 수정 모달 관련 상태
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [editMood, setEditMood] = useState(null);
+  const [editTags, setEditTags] = useState([]);
+  const [editContent, setEditContent] = useState('');
 
   const formatDate = (date) => {
     const year = date.getFullYear();
@@ -24,14 +36,58 @@ const CalendarPage = () => {
     return formatDate(entryDate) === formatDate(selectedDate);
   }).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)); // 시간 순으로 정렬
 
-  const handleEditEntry = (id) => {
-    // TODO: 일기 편집 기능 구현 (새로운 페이지로 이동 또는 모달 열기)
-    alert(`일기 #${id} 편집 기능은 아직 구현되지 않았습니다.`);
+  const handleEditEntry = (entry) => {
+    setEditingEntry(entry);
+    setEditMood(entry.moodId || null); // moodId가 없으면 null (기존 데이터 호환성)
+    setEditTags(entry.tags || []);
+    setEditContent(entry.content || '');
+    setIsEditing(true);
   };
 
   const handleDeleteRecord = (id) => {
     if (window.confirm('정말로 이 기록을 삭제하시겠습니까?')) {
       deleteEntry(id);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (!editMood) {
+      alert('기분을 선택해주세요.');
+      return;
+    }
+
+    const moodMap = {
+      happy: { label: '행복', emoji: '😊' },
+      excited: { label: '신남', emoji: '🥳' },
+      calm: { label: '편안', emoji: '😌' },
+      soso: { label: '그저', emoji: '😐' },
+      depressed: { label: '우울', emoji: '😔' },
+      angry: { label: '화남', emoji: '😡' },
+      etc: { label: '기타', emoji: '💡' },
+    };
+    const currentMood = moodMap[editMood] || { label: '알 수 없음', emoji: '❓' };
+
+    updateEntry(editingEntry.id, {
+      moodId: editMood,
+      mood: currentMood.label,
+      moodEmoji: currentMood.emoji,
+      tags: editTags,
+      content: editContent,
+    });
+
+    setIsEditing(false);
+    setEditingEntry(null);
+  };
+
+  const handleToggleTag = (tag) => {
+    setEditTags((prevTags) =>
+      prevTags.includes(tag) ? prevTags.filter((t) => t !== tag) : [...prevTags, tag]
+    );
+  };
+
+  const handleAddTag = (tag) => {
+    if (tag && !editTags.includes(tag)) {
+      setEditTags((prevTags) => [...prevTags, tag]);
     }
   };
 
@@ -86,7 +142,7 @@ const CalendarPage = () => {
                   )}
                 </div>
                 <div className="flex gap-3">
-                  <button onClick={() => handleEditEntry(record.id)} className="text-gray-500 hover:text-blue-500">
+                  <button onClick={() => handleEditEntry(record)} className="text-gray-500 hover:text-blue-500">
                     <Edit size={20} />
                   </button>
                   <button onClick={() => handleDeleteRecord(record.id)} className="text-gray-500 hover:text-red-500">
@@ -102,6 +158,44 @@ const CalendarPage = () => {
           </div>
         )}
       </div>
+
+      {/* 수정 모달 */}
+      <Modal
+        isOpen={isEditing}
+        onClose={() => setIsEditing(false)}
+        title="기록 수정"
+      >
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <h3 className="font-semibold">오늘의 기분</h3>
+            <MoodSelector selectedMood={editMood} onSelectMood={setEditMood} />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-semibold">태그</h3>
+            <TagSelector
+              selectedTags={editTags}
+              onToggleTag={handleToggleTag}
+              onAddTag={handleAddTag}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <h3 className="font-semibold">메모</h3>
+            <Textarea
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              placeholder="내용을 입력하세요..."
+              rows="4"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-4">
+            <Button variant="ghost" onClick={() => setIsEditing(false)}>취소</Button>
+            <Button onClick={handleSaveEdit}>저장</Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

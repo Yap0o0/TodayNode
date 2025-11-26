@@ -41,23 +41,33 @@ const AnalysisPage = () => {
   const moodData = moodLabels.map(label => moodDistribution[label] || 0);
 
   // 가장 많이 느낀 감정 찾기
-  const mostFrequentMood = Object.keys(moodDistribution).reduce((a, b) => 
+  const mostFrequentMood = Object.keys(moodDistribution).reduce((a, b) =>
     moodDistribution[a] > moodDistribution[b] ? a : b
-  , '없음');
+    , '없음');
 
   const hasEnoughRecords = entries.length >= 3;
 
-  // 임시 AI 인사이트 목업 데이터 (실제 분석 로직은 추후 추가)
-  const mockAiInsights = {
-    tagEmotion: [
-      "#음식 태그와 행복 감정이 총 3번 함께 나타났습니다.",
-    ],
-    musicTaste: [
-      "행복 감정일 때 음악을 가장 많이 선택하셨어요 (총 3번)",
-      "#POP 장르를 가장 많이 선택하셨어요 (총 2번)",
-    ],
-    overall: `지난 ${entries.length}개의 기록을 분석했어요. 꾸준히 기록하면 더 정확한 인사이트를 제공할 수 있어요!`,
-  };
+  const [aiInsights, setAiInsights] = React.useState(null);
+  const [isLoadingInsights, setIsLoadingInsights] = React.useState(false);
+
+  React.useEffect(() => {
+    const fetchInsights = async () => {
+      if (entries.length >= 3) {
+        setIsLoadingInsights(true);
+        try {
+          const { analyzeHabits } = await import('../utils/geminiApi');
+          const insights = await analyzeHabits(entries);
+          setAiInsights(insights);
+        } catch (error) {
+          console.error("Failed to fetch insights:", error);
+        } finally {
+          setIsLoadingInsights(false);
+        }
+      }
+    };
+
+    fetchInsights();
+  }, [entries.length]); // entries.length가 변경될 때마다 분석 수행 (최적화 필요 시 수정)
 
   const chartData = {
     labels: moodLabels,
@@ -110,27 +120,38 @@ const AnalysisPage = () => {
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h3 className="text-xl font-semibold mb-3">AI 인사이트</h3>
         {hasEnoughRecords ? (
-          <div className="space-y-4">
-            <div>
-              <p className="font-medium text-lg mb-2">태그-감정 분석 (예시)</p>
-              <ul className="list-disc pl-5 text-gray-700">
-                {mockAiInsights.tagEmotion.map((insight, index) => (
-                  <li key={index}>{insight}</li>
-                ))}
-              </ul>
+          isLoadingInsights ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              <span className="ml-3 text-gray-600">AI가 기록을 분석 중입니다...</span>
             </div>
-            <div>
-              <p className="font-medium text-lg mb-2">음악 취향 분석 (예시)</p>
-              <ul className="list-disc pl-5 text-gray-700">
-                {mockAiInsights.musicTaste.map((insight, index) => (
-                  <li key={index}>{insight}</li>
-                ))}
-              </ul>
+          ) : aiInsights ? (
+            <div className="space-y-4">
+              <div>
+                <p className="font-medium text-lg mb-2">태그-감정 분석</p>
+                <ul className="list-disc pl-5 text-gray-700">
+                  {aiInsights.tagEmotion.map((insight, index) => (
+                    <li key={index}>{insight}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium text-lg mb-2">음악 취향 분석</p>
+                <ul className="list-disc pl-5 text-gray-700">
+                  {aiInsights.musicTaste.map((insight, index) => (
+                    <li key={index}>{insight}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="p-4 bg-purple-50 rounded-lg text-purple-800 font-medium">
+                <p>{aiInsights.overall}</p>
+              </div>
             </div>
-            <div className="p-4 bg-purple-50 rounded-lg text-purple-800 font-medium">
-              <p>{mockAiInsights.overall}</p>
+          ) : (
+            <div className="text-center text-gray-500 py-8">
+              <p>분석 결과를 불러오지 못했습니다.</p>
             </div>
-          </div>
+          )
         ) : (
           <div className="text-center text-gray-500 py-8">
             <p className="text-lg mb-2">데이터를 분석하려면 최소 3개 이상의 기록이 필요해요!</p>
