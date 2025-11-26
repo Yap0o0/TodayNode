@@ -1,61 +1,68 @@
 import React, { useState, useEffect } from 'react';
 import MoodSelector from './MoodSelector'; // MoodSelector 재사용
 
+// 컴포넌트 외부 또는 별도의 constants 파일로 분리하는 것을 권장합니다.
+const moods = [
+  { id: 'happy', label: '행복', emoji: '😊' },
+  { id: 'excited', label: '신남', emoji: '🥳' },
+  { id: 'calm', label: '편안', emoji: '😌' },
+  { id: 'soso', label: '그저', emoji: '😐' },
+  { id: 'depressed', label: '우울', emoji: '😔' },
+  { id: 'angry', label: '화남', emoji: '😡' },
+  { id: 'etc', label: '기타', emoji: '💡' },
+];
+
+const getMoodIdFromLabel = (label) => {
+  const mood = moods.find(m => m.label === label);
+  return mood ? mood.id : null;
+};
+
+
 /**
  * 일기 작성 및 편집 폼 컴포넌트입니다.
- * @param {object} props - 컴포넌트 프롭스
- * @param {object} [props.initialData] - 편집 모드일 때 초기 데이터
- * @param {function} props.onSave - 저장 버튼 클릭 시 호출될 함수
- * @param {function} props.onCancel - 취소 버튼 클릭 시 호출될 함수
  */
 const WriteDiaryForm = ({ initialData, onSave, onCancel }) => {
-  const [selectedMood, setSelectedMood] = useState(initialData?.moodId || null);
+  const getInitialMoodId = () => {
+    if (!initialData) return null;
+    if (initialData.moodId) return initialData.moodId;
+    return getMoodIdFromLabel(initialData.mood);
+  };
+
+  const [selectedMood, setSelectedMood] = useState(getInitialMoodId);
   const [title, setTitle] = useState(initialData?.title || '');
   const [content, setContent] = useState(initialData?.content || '');
 
-  // 편집 모드 진입 시 초기 데이터 설정
   useEffect(() => {
-    if (initialData) {
-      setSelectedMood(initialData.moodId || null);
-      setTitle(initialData.title || '');
-      setContent(initialData.content || '');
-    }
+    setSelectedMood(getInitialMoodId());
+    setTitle(initialData?.title || '');
+    setContent(initialData?.content || '');
   }, [initialData]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // 간단한 유효성 검사
     if (!selectedMood || !title.trim() || !content.trim()) {
       alert('기분, 제목, 내용을 모두 입력해주세요.');
       return;
     }
-    // 현재 시간 추가 (임시)
-    const now = new Date();
-    const date = now.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\./g, '').trim().replace(/ /g, '-');
-    const time = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
     
-    // moodId에 해당하는 emoji를 MoodSelector에서 가져와야 하지만,
-    // 현재는 직접 매핑 (추후 MoodSelector의 moods 배열을 활용하도록 개선 필요)
-    const moodEmojis = {
-      happy: '😊', excited: '🥳', calm: '😌', soso: '😐', depressed: '😔', angry: '😡', etc: '💡'
-    };
-    const moodEmoji = moodEmojis[selectedMood] || '😐'; // 기본값
+    const selectedMoodObject = moods.find(m => m.id === selectedMood) || moods.find(m => m.id === 'soso');
 
     onSave({
-      moodId: selectedMood,
-      moodEmoji,
+      moodId: selectedMoodObject.id,
+      mood: selectedMoodObject.label,
+      moodEmoji: selectedMoodObject.emoji,
       title: title.trim(),
       content: content.trim(),
-      date,
-      time,
-      mood: selectedMood, // 기분 id를 mood로 사용 (추후 한글 이름으로 변경 가능)
     });
   };
 
   return (
     <div className="write-diary-form p-4 bg-white rounded-lg shadow-md">
       <form onSubmit={handleSubmit}>
-        <MoodSelector selectedMood={selectedMood} onSelectMood={setSelectedMood} />
+        <div className="mb-6">
+          <label className="block text-xl font-semibold mb-3">오늘의 기분</label>
+          <MoodSelector selectedMood={selectedMood} onSelectMood={setSelectedMood} />
+        </div>
 
         <div className="mb-4">
           <label htmlFor="title" className="block text-xl font-semibold mb-2">제목</label>

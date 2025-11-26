@@ -3,16 +3,29 @@ import { Sparkles } from 'lucide-react';
 import MoodSelector from '../components/MoodSelector';
 import TagSelector from '../components/TagSelector';
 import MusicRecommender from '../components/MusicRecommender';
+import { useHabits } from '../context/HabitContext';
+import { generateMusicKeywords } from '../utils/geminiApi';
+import { searchSpotify } from '../utils/spotifyApi';
+import { Card, CardHeader, CardContent, CardFooter, CardTitle, CardDescription } from '../components/Card';
+import { Button } from '../components/Button';
+import { Textarea } from '../components/Textarea';
 
 /**
  * 기분 기록 페이지 컴포넌트입니다.
  * 사용자의 기분과 태그를 기록하고 음악을 추천받는 기능을 제공합니다.
  */
 const RecordPage = () => {
-  const [isRecording, setIsRecording] = useState(false); // 기록 시작 여부
-  const [selectedMood, setSelectedMood] = useState(null); // 선택된 기분
-  const [selectedTags, setSelectedTags] = useState([]); // 선택된 태그 배열
-  const [memoContent, setMemoContent] = useState(''); // 메모 내용
+  const { addEntry } = useHabits();
+
+  const [isRecording, setIsRecording] = useState(false);
+  const [selectedMood, setSelectedMood] = useState(null);
+  const [selectedTags, setSelectedTags] = useState([]);
+  const [memoContent, setMemoContent] = useState('');
+  const [recommendedMusic, setRecommendedMusic] = useState([]);
+  const [isLoadingMusic, setIsLoadingMusic] = useState(false);
+
+  const today = new Date();
+  const dateString = `${today.getFullYear()}년 ${today.getMonth() + 1}월 ${today.getDate()}일`;
 
   const handleSelectMood = (moodId) => {
     setSelectedMood(moodId);
@@ -25,81 +38,123 @@ const RecordPage = () => {
   };
 
   const handleAddTag = (tag) => {
-    setSelectedTags((prevTags) => [...prevTags, tag]);
+    if (tag && !selectedTags.includes(tag)) {
+      setSelectedTags((prevTags) => [...prevTags, tag]);
+    }
   };
 
-  const handleSave = () => {
-    // TODO: 여기에 저장 로직 (LocalStorage 등) 구현
-    console.log('기록 저장:', { selectedMood, selectedTags, memoContent });
-    setIsRecording(false); // 저장 후 초기 화면으로 돌아감
+  const handleSave = async () => {
+    if (!selectedMood) {
+      alert('오늘의 기분을 선택해주세요.');
+      return;
+    }
+
+    setIsLoadingMusic(true);
+
+    const moodMap = {
+      happy: { label: '행복', emoji: '😊' },
+      excited: { label: '신남', emoji: '🥳' },
+      calm: { label: '편안', emoji: '😌' },
+      soso: { label: '그저', emoji: '😐' },
+      depressed: { label: '우울', emoji: '😔' },
+      angry: { label: '화남', emoji: '😡' },
+      etc: { label: '기타', emoji: '💡' },
+    };
+    const currentMood = moodMap[selectedMood] || { label: '알 수 없음', emoji: '❓' };
+
+    const keywords = await generateMusicKeywords(
+      currentMood.label,
+      selectedTags,
+      memoContent
+    );
+
+    let musicRecommendations = [];
+    if (keywords) {
+      musicRecommendations = await searchSpotify(keywords, 'track', 5);
+      setRecommendedMusic(musicRecommendations);
+    }
+    
+    setIsLoadingMusic(false);
+
+    const newRecord = {
+      date: new Date().toISOString(),
+      moodId: selectedMood, // <-- MOOD ID 추가
+      mood: currentMood.label,
+      moodEmoji: currentMood.emoji,
+      tags: selectedTags,
+      content: memoContent,
+      musicRecommendation: musicRecommendations,
+    };
+
+    addEntry(newRecord);
+
+    setIsRecording(false);
     setSelectedMood(null);
     setSelectedTags([]);
     setMemoContent('');
+    setRecommendedMusic([]);
   };
 
   const handleCancel = () => {
-    setIsRecording(false); // 취소 후 초기 화면으로 돌아감
+    setIsRecording(false);
     setSelectedMood(null);
     setSelectedTags([]);
     setMemoContent('');
+    setRecommendedMusic([]);
   };
 
+  if (!isRecording) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-center">
+        <Sparkles size={48} className="text-yellow-400 mb-4" />
+        <h2 className="text-xl font-semibold mb-2">오늘의 하루를 기록해보세요</h2>
+        <p className="text-gray-500 mb-6">간단한 기록으로 소중한 순간을 남겨요.</p>
+        <Button onClick={() => setIsRecording(true)} size="lg">
+          기록 시작하기
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className="record-page p-4 bg-white rounded-lg shadow-md">
-      {!isRecording ? (
-        // Empty State
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-200px)] text-gray-500">
-          <Sparkles size={48} className="text-yellow-400 mb-4" />
-          <p className="text-lg mb-6">오늘의 기분을 기록해보세요</p>
-          <button
-            onClick={() => setIsRecording(true)}
-            className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-full text-lg font-semibold shadow-lg hover:from-purple-600 hover:to-pink-600 transition-all"
-          >
-            기록 시작하기
-          </button>
-        </div>
-      ) : (
-        // Recording State
-        <div className="recording-form">
-          <h2 className="text-2xl font-bold mb-6 text-gray-800">새로운 기록</h2>
+    <div className="space-y-6 pb-16">
+      <Card>
+        <CardHeader>
+          <CardTitle>오늘의 체크인</CardTitle>
+          <CardDescription>{dateString}</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-2">
+            <h3 className="font-semibold">오늘의 기분</h3>
+            <MoodSelector selectedMood={selectedMood} onSelectMood={handleSelectMood} />
+          </div>
 
-          <MoodSelector selectedMood={selectedMood} onSelectMood={handleSelectMood} />
-
-          <TagSelector
-            selectedTags={selectedTags}
-            onToggleTag={handleToggleTag}
-            onAddTag={handleAddTag}
-          />
-
-          <div className="memo-section mb-6">
-            <h3 className="text-xl font-semibold mb-3">메모 (선택)</h3>
-            <textarea
+          <div className="space-y-2">
+            <h3 className="font-semibold">태그</h3>
+            <TagSelector
+              selectedTags={selectedTags}
+              onToggleTag={handleToggleTag}
+              onAddTag={handleAddTag}
+            />
+          </div>
+          
+          <div className="space-y-2">
+            <h3 className="font-semibold">메모 (선택)</h3>
+            <Textarea
               value={memoContent}
               onChange={(e) => setMemoContent(e.target.value)}
               placeholder="오늘의 순간을 기록해보세요..."
               rows="4"
-              className="w-full p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-            ></textarea>
+            />
           </div>
-
-          <MusicRecommender />
-
-          <div className="flex justify-end gap-4 mt-6">
-            <button
-              onClick={handleCancel}
-              className="bg-gray-300 text-gray-800 px-6 py-2 rounded-full font-semibold hover:bg-gray-400 transition-colors"
-            >
-              취소
-            </button>
-            <button
-              onClick={handleSave}
-              className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-2 rounded-full font-semibold shadow-lg hover:from-purple-600 hover:to-pink-600 transition-colors"
-            >
-              저장
-            </button>
-          </div>
-        </div>
-      )}
+        </CardContent>
+        <CardFooter className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={handleCancel}>취소</Button>
+            <Button onClick={handleSave}>저장</Button>
+        </CardFooter>
+      </Card>
+      
+      <MusicRecommender recommendedMusic={recommendedMusic} isLoading={isLoadingMusic} />
     </div>
   );
 };

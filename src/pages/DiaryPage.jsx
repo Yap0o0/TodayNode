@@ -1,29 +1,19 @@
 import React, { useState } from 'react';
 import { PencilLine, Edit, Trash2 } from 'lucide-react';
-import WriteDiaryForm from '../components/WriteDiaryForm'; // WriteDiaryForm import
+import WriteDiaryForm from '../components/WriteDiaryForm';
+import { useHabits } from '../context/HabitContext'; // useHabits import
 
 /**
  * 일기 페이지 컴포넌트입니다.
  * 일기 목록을 보여주거나 새 일기를 작성/편집하는 기능을 제공합니다.
  */
 const DiaryPage = () => {
+  const { entries, addEntry, updateEntry, deleteEntry } = useHabits(); // HabitContext에서 데이터와 함수 가져오기
   const [isWriting, setIsWriting] = useState(false); // 일기 작성/편집 모드 여부
   const [editingEntryId, setEditingEntryId] = useState(null); // 편집 중인 일기 ID
   
-  // 임시 목업 데이터
-  const [diaryEntries, setDiaryEntries] = useState([
-    {
-      id: 'diary-1',
-      moodId: 'happy',
-      moodEmoji: '😊',
-      title: '행복했던 하루',
-      date: '2025-11-23',
-      time: '21:40',
-      mood: '행복',
-      content: '오랜만에 친구와 만나 즐거운 시간을 보냈다. 맛있는 저녁도 먹고 영화도 봐서 기분이 좋다.',
-    },
-    // 다른 일기 엔트리들을 추가할 수 있습니다.
-  ]);
+  // content 필드가 있는 엔트리만 일기(Diary)로 간주합니다.
+  const diaryEntries = entries.filter(entry => entry.content && entry.content.trim() !== '');
 
   const handleStartWriting = () => {
     setIsWriting(true);
@@ -31,28 +21,41 @@ const DiaryPage = () => {
   };
 
   const handleEditEntry = (id) => {
-    const entryToEdit = diaryEntries.find(entry => entry.id === id);
+    const entryToEdit = entries.find(entry => entry.id === id);
     if (entryToEdit) {
       setEditingEntryId(id);
       setIsWriting(true);
     }
   };
 
-  const handleDeleteEntry = (id) => {
+  const handleDeleteDiary = (id) => {
     if (window.confirm('정말로 이 일기를 삭제하시겠습니까?')) {
-      setDiaryEntries(diaryEntries.filter(entry => entry.id !== id));
+      deleteEntry(id); // Context의 deleteEntry 사용
     }
   };
 
   const handleSaveDiary = (newEntryData) => {
+    // newEntryData에는 moodId, moodEmoji, title, content, date, time, mood가 포함
     if (editingEntryId) {
       // 기존 일기 업데이트
-      setDiaryEntries(diaryEntries.map(entry => 
-        entry.id === editingEntryId ? { ...newEntryData, id: editingEntryId } : entry
-      ));
+      updateEntry(editingEntryId, { 
+        mood: newEntryData.mood, 
+        moodEmoji: newEntryData.moodEmoji, 
+        content: newEntryData.content, 
+        title: newEntryData.title,
+        // tags는 일기에서는 필수가 아니므로 업데이트 시점에만 포함하지 않음
+        // timestamp는 HabitContext에서 관리
+      });
     } else {
       // 새 일기 추가
-      setDiaryEntries([...diaryEntries, { ...newEntryData, id: `diary-${Date.now()}` }]);
+      addEntry({
+        mood: newEntryData.mood,
+        moodEmoji: newEntryData.moodEmoji,
+        content: newEntryData.content,
+        title: newEntryData.title,
+        // tags는 일기에서는 필수가 아니므로 빈 배열 또는 기본값 설정 (PRD 스키마에 따라)
+        tags: [], // 일기에서는 태그가 필수가 아니므로 비워둠
+      });
     }
     setIsWriting(false);
     setEditingEntryId(null);
@@ -64,7 +67,7 @@ const DiaryPage = () => {
   };
 
   if (isWriting) {
-    const initialData = editingEntryId ? diaryEntries.find(entry => entry.id === editingEntryId) : null;
+    const initialData = editingEntryId ? entries.find(entry => entry.id === editingEntryId) : null;
     return (
       <WriteDiaryForm
         initialData={initialData}
@@ -104,7 +107,7 @@ const DiaryPage = () => {
                   <span className="font-bold text-lg text-gray-700">{entry.title}</span>
                 </div>
                 <p className="text-sm text-gray-500 mb-2">
-                  {entry.date} {entry.time} • {entry.mood}
+                  {new Date(entry.timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} {new Date(entry.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })} • {entry.mood}
                 </p>
                 <p className="text-gray-600 line-clamp-1">{entry.content}</p>
               </div>
@@ -112,7 +115,7 @@ const DiaryPage = () => {
                 <button onClick={() => handleEditEntry(entry.id)} className="text-gray-500 hover:text-blue-500">
                   <Edit size={20} />
                 </button>
-                <button onClick={() => handleDeleteEntry(entry.id)} className="text-gray-500 hover:text-red-500">
+                <button onClick={() => handleDeleteDiary(entry.id)} className="text-gray-500 hover:text-red-500">
                   <Trash2 size={20} />
                 </button>
               </div>
