@@ -65,7 +65,7 @@ const RecordPage = () => {
       const tagQuery = tags.slice(0, 2).join(' ');
       const searchQuery = `${moodLabel} ${tagQuery} ${randomKeyword}`.trim();
 
-      console.log("Spotify 검색 쿼리:", searchQuery);
+      // console.log("Spotify 검색 쿼리:", searchQuery);
 
       // 5. Spotify 검색
       const musicRecommendations = await searchSpotify(searchQuery, 'track', 5);
