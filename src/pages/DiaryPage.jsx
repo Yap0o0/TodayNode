@@ -11,9 +11,12 @@ const DiaryPage = () => {
   const { entries, addEntry, updateEntry, deleteEntry } = useHabits(); // HabitContext에서 데이터와 함수 가져오기
   const [isWriting, setIsWriting] = useState(false); // 일기 작성/편집 모드 여부
   const [editingEntryId, setEditingEntryId] = useState(null); // 편집 중인 일기 ID
-  
-  // content 필드가 있는 엔트리만 일기(Diary)로 간주합니다.
-  const diaryEntries = entries.filter(entry => entry.content && entry.content.trim() !== '');
+
+  // content 필드가 있고, type이 'diary'인 엔트리만 일기(Diary)로 간주합니다.
+  // 기존 데이터(type 필드가 없는 경우)는 content가 있으면 일기로 간주할 수도 있지만, 
+  // 명확한 분리를 위해 type 체크를 우선합니다. (마이그레이션 이슈 방지 위해 type이 없으면 제외하거나 포함 정책 결정 필요)
+  // 여기서는 type === 'diary'만 보여주도록 엄격하게 필터링합니다.
+  const diaryEntries = entries.filter(entry => entry.type === 'diary');
 
   const handleStartWriting = () => {
     setIsWriting(true);
@@ -38,10 +41,10 @@ const DiaryPage = () => {
     // newEntryData에는 moodId, moodEmoji, title, content, date, time, mood가 포함
     if (editingEntryId) {
       // 기존 일기 업데이트
-      updateEntry(editingEntryId, { 
-        mood: newEntryData.mood, 
-        moodEmoji: newEntryData.moodEmoji, 
-        content: newEntryData.content, 
+      updateEntry(editingEntryId, {
+        mood: newEntryData.mood,
+        moodEmoji: newEntryData.moodEmoji,
+        content: newEntryData.content,
         title: newEntryData.title,
         // tags는 일기에서는 필수가 아니므로 업데이트 시점에만 포함하지 않음
         // timestamp는 HabitContext에서 관리
@@ -49,6 +52,7 @@ const DiaryPage = () => {
     } else {
       // 새 일기 추가
       addEntry({
+        type: 'diary', // 데이터 타입 구분: 일기
         mood: newEntryData.mood,
         moodEmoji: newEntryData.moodEmoji,
         content: newEntryData.content,

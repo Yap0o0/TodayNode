@@ -20,10 +20,13 @@ const getFriendlyErrorMessage = (error, response = null) => {
   // HTTP 상태 코드에 따른 메시지
   if (response) {
     if (response.status >= 500) {
-      return '서버에 문제가 발생했습니다. 잠시 후 다시 시도해주세요.';
+      return '서버에 문제가 발생했습니다. 잠시 후 다시 시도해주세요. (500)';
     }
     if (response.status === 404) {
-      return '요청하신 내용을 찾을 수 없습니다.';
+      return '요청하신 정보를 찾을 수 없습니다. (404)';
+    }
+    if (response.status === 401 || response.status === 403) {
+      return '접근 권한이 없습니다. 관리자에게 문의해주세요.';
     }
     if (response.status >= 400) {
       return '잘못된 요청입니다. 입력 내용을 다시 확인해주세요.';
@@ -34,16 +37,18 @@ const getFriendlyErrorMessage = (error, response = null) => {
   if (error.name === 'AbortError') {
     return '요청 시간이 초과되었습니다. 네트워크 상태를 확인해주세요.';
   }
-  if (error instanceof TypeError) { // 네트워크 실패, CORS, 잘못된 URL 등
-    return '네트워크 연결에 실패했습니다. 인터넷 연결을 확인해주세요.';
-  }
-  
-  // 데이터 파싱 에러 (SyntaxError)
-  if (error instanceof SyntaxError) {
-    return '데이터를 처리하는 중 오류가 발생했습니다.';
+
+  // TypeError는 주로 네트워크 오류나 CORS 문제로 발생
+  if (error instanceof TypeError && error.message === 'Failed to fetch') {
+    return '인터넷 연결을 확인해주세요. 서버에 연결할 수 없습니다.';
   }
 
-  return '알 수 없는 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+  // 데이터 파싱 에러
+  if (error instanceof SyntaxError) {
+    return '데이터를 처리하는 중 오류가 발생했습니다. (JSON Parsing Error)';
+  }
+
+  return `알 수 없는 오류가 발생했습니다. (${error.message})`;
 };
 
 /**

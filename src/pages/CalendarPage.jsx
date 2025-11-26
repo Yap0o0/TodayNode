@@ -104,9 +104,33 @@ const CalendarPage = () => {
                 const entryDate = new Date(entry.timestamp);
                 return formatDate(entryDate) === formatDate(date);
               });
+
               if (recordsOnDay.length > 0) {
-                // 해당 날짜의 첫 번째 기록의 이모지를 표시
-                return <span className="day-emoji">{recordsOnDay[0].moodEmoji}</span>;
+                // 가장 많이 등장한 기분 찾기 (빈도수 계산)
+                const moodCounts = recordsOnDay.reduce((acc, record) => {
+                  const emoji = record.moodEmoji;
+                  acc[emoji] = (acc[emoji] || 0) + 1;
+                  return acc;
+                }, {});
+
+                // 최빈값 찾기
+                let maxCount = 0;
+                let mostFrequentEmoji = recordsOnDay[0].moodEmoji; // 기본값: 첫 번째 기록
+
+                Object.entries(moodCounts).forEach(([emoji, count]) => {
+                  if (count > maxCount) {
+                    maxCount = count;
+                    mostFrequentEmoji = emoji;
+                  } else if (count === maxCount) {
+                    // 빈도수가 같으면 최신 기록 우선 (recordsOnDay는 시간순 정렬되어 있다고 가정하면 마지막 요소가 최신일 수 있으나, 
+                    // 현재 정렬 로직 확인 필요. 위에서 시간순 정렬함. 
+                    // 여기서는 단순화를 위해 먼저 발견된 것(또는 기존 유지)을 사용하거나, 
+                    // 더 정교하게 하려면 recordsOnDay를 순회하며 가중치를 둘 수 있음.
+                    // 일단 단순 빈도수 우선, 동률 시 기존 유지(먼저 나온 것)로 구현.
+                  }
+                });
+
+                return <span className="day-emoji">{mostFrequentEmoji}</span>;
               }
             }
             return null;

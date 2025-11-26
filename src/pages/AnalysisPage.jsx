@@ -82,8 +82,21 @@ const AnalysisPage = () => {
         pointBorderColor: '#fff',
         pointHoverBackgroundColor: '#fff',
         pointHoverBorderColor: 'rgb(139, 92, 246)',
+        pointRadius: 6, // 포인트 크기 증가
+        pointHoverRadius: 8,
       },
     ],
+  };
+
+  // 이모지 매핑
+  const moodEmojis = {
+    '행복': '😊',
+    '신남': '🥳',
+    '편안': '😌',
+    '그저': '😐',
+    '우울': '😔',
+    '화남': '😡',
+    '기타': '💡',
   };
 
   const chartOptions = {
@@ -97,6 +110,13 @@ const AnalysisPage = () => {
         display: false,
         text: '감정 분포',
       },
+      tooltip: {
+        callbacks: {
+          label: function (context) {
+            return `${context.label}: ${context.raw}회`;
+          }
+        }
+      }
     },
     scales: {
       y: {
@@ -109,12 +129,38 @@ const AnalysisPage = () => {
     },
   };
 
+  // 차트 플러그인: 이모지 그리기
+  const emojiPlugin = {
+    id: 'emojiPlugin',
+    afterDatasetsDraw(chart) {
+      const { ctx, data } = chart;
+      const dataset = data.datasets[0];
+      const meta = chart.getDatasetMeta(0);
+
+      ctx.save();
+      ctx.font = '30px Arial'; // 이모지 크기 확대
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+
+      meta.data.forEach((point, index) => {
+        const value = dataset.data[index];
+        if (value > 0) { // 데이터가 0보다 클 때만 이모지 표시
+          const moodLabel = data.labels[index];
+          const emoji = moodEmojis[moodLabel] || '❓';
+          // 포인트 위에 이모지 그리기 (y축 좌표에서 조금 위로)
+          ctx.fillText(emoji, point.x, point.y - 20);
+        }
+      });
+      ctx.restore();
+    }
+  };
+
   return (
     <div className="analysis-page p-4">
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h3 className="text-xl font-semibold mb-3">감정 분포</h3>
         <p className="text-gray-600 mb-4">기분별 기록 횟수를 확인하세요</p>
-        <Line data={chartData} options={chartOptions} />
+        <Line data={chartData} options={chartOptions} plugins={[emojiPlugin]} />
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">

@@ -4,6 +4,6 @@
 
 @layer base {
   body {
-    @apply bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 min-h-screen font-sans text-gray-900 antialiased;
+    @apply bg-gradient-to-br from-pastel-purple/30 via-white to-pastel-pink/30 min-h-screen font-sans text-gray-900 antialiased;
   }
 }
