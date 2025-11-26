@@ -149,3 +149,9 @@ LocalStorage에 저장될 데이터(haru-node-logs)의 구조 예시입니다.
     \# 스타일링 (Tailwind CSS 추천)  
     npm install \-D tailwindcss postcss autoprefixer  
     npx tailwindcss init \-p  
+
+##Rules
+1. **MVVM 엄수**
+2. **한글 주석** : 학생용 교육 코드
+3. **KISS** : 불필요한 복잡성 회피 및 직관적인 디자인
+4. **DRY** : 전체 프로젝트에서 반복되는 동일 코드가 없도록 주의

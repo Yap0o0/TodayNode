@@ -1,35 +1,40 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import React, { useState } from 'react';
+import './App.css';
+import Layout from './components/Layout';
+import TabNav from './components/TabNav';
+import RecordPage from './pages/RecordPage';
+import CalendarPage from './pages/CalendarPage';
+import DiaryPage from './pages/DiaryPage';
+import AnalysisPage from './pages/AnalysisPage';
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [activeTab, setActiveTab] = useState('record');
+
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'record':
+        return <RecordPage />;
+      case 'calendar':
+        return <CalendarPage />;
+      case 'diary':
+        return <DiaryPage />;
+      case 'analysis':
+        return <AnalysisPage />;
+      default:
+        return <RecordPage />;
+    }
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+    <Layout>
+      <div className="p-4">
+        <TabNav activeTab={activeTab} setActiveTab={setActiveTab} />
       </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR
-        </p>
+      <div className="flex-grow p-4">
+        {renderContent()}
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </Layout>
+  );
 }
 
-export default App
+export default App;
