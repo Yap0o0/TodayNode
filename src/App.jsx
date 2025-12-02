@@ -6,6 +6,7 @@ import RecordPage from './pages/RecordPage';
 import CalendarPage from './pages/CalendarPage';
 import DiaryPage from './pages/DiaryPage';
 import AnalysisPage from './pages/AnalysisPage';
+import SettingsPage from './pages/SettingsPage';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/diary" element={<DiaryPage />} />
           <Route path="/analysis" element={<AnalysisPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Routes>
       </Layout>
     </BrowserRouter>

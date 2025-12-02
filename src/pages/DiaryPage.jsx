@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { PencilLine, Edit, Trash2 } from 'lucide-react';
+import { PencilLine, Edit, Trash2, Sparkles, Share2 } from 'lucide-react';
 import WriteDiaryForm from '../components/WriteDiaryForm';
+import ShareModal from '../components/ShareModal';
 import { useHabits } from '../context/HabitContext'; // useHabits import
 
 /**
@@ -11,6 +12,7 @@ const DiaryPage = () => {
   const { entries, addEntry, updateEntry, deleteEntry } = useHabits(); // HabitContext에서 데이터와 함수 가져오기
   const [isWriting, setIsWriting] = useState(false); // 일기 작성/편집 모드 여부
   const [editingEntryId, setEditingEntryId] = useState(null); // 편집 중인 일기 ID
+  const [shareModalEntry, setShareModalEntry] = useState(null); // 공유할 일기 데이터
 
   // content 필드가 있고, type이 'diary'인 엔트리만 일기(Diary)로 간주합니다.
   // 기존 데이터(type 필드가 없는 경우)는 content가 있으면 일기로 간주할 수도 있지만, 
@@ -35,6 +37,10 @@ const DiaryPage = () => {
     if (window.confirm('정말로 이 일기를 삭제하시겠습니까?')) {
       deleteEntry(id); // Context의 deleteEntry 사용
     }
+  };
+
+  const handleShareEntry = (entry) => {
+    setShareModalEntry(entry);
   };
 
   const handleSaveDiary = (newEntryData) => {
@@ -85,12 +91,14 @@ const DiaryPage = () => {
     <div className="diary-page p-4">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-gray-800">일기장</h2>
-        <button
-          onClick={handleStartWriting}
-          className="bg-purple-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md hover:bg-purple-600 transition-colors flex items-center"
-        >
-          <PencilLine size={18} className="mr-2" /> 일기 쓰기
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleStartWriting}
+            className="bg-purple-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md hover:bg-purple-600 transition-colors flex items-center"
+          >
+            <PencilLine size={18} className="mr-2" /> 일기 쓰기
+          </button>
+        </div>
       </div>
 
       {diaryEntries.length === 0 ? (
@@ -103,30 +111,48 @@ const DiaryPage = () => {
       ) : (
         // Populated State
         <div className="space-y-4">
-          {diaryEntries.map(entry => (
-            <div key={entry.id} className="p-4 bg-white rounded-lg shadow-md flex justify-between items-center">
-              <div>
-                <div className="flex items-center mb-2">
-                  <span className="text-2xl mr-3">{entry.moodEmoji}</span>
-                  <span className="font-bold text-lg text-gray-700">{entry.title}</span>
+          {diaryEntries.map((entry, index) => {
+            // Cycle through pastel colors
+            const colors = ['card-pink', 'card-beige', 'card-yellow', 'card-mint'];
+            const colorClass = colors[index % colors.length];
+            // Add slight rotation for "sticky note" effect
+            const rotation = (index % 2 === 0 ? -1 : 1) * (Math.random() * 1.5);
+
+            return (
+              <div key={entry.id} className={`p-5 mb-4 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] shadow-md flex justify-between items-center transition-transform hover:scale-[1.01] ${colorClass}`} style={{ transform: `rotate(${rotation}deg)` }}>
+                <div className="flex-1">
+                  <div className="flex items-center mb-2">
+                    <span className="text-2xl mr-3">{entry.moodEmoji}</span>
+                    <span className="font-bold text-lg text-[var(--text-main)]">{entry.title}</span>
+                  </div>
+                  <p className="text-sm text-[var(--text-sub)] mb-2">
+                    {new Date(entry.timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} • {entry.mood}
+                  </p>
+                  <p className="text-[var(--text-main)] line-clamp-1">{entry.content}</p>
                 </div>
-                <p className="text-sm text-gray-500 mb-2">
-                  {new Date(entry.timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} {new Date(entry.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })} • {entry.mood}
-                </p>
-                <p className="text-gray-600 line-clamp-1">{entry.content}</p>
+                <div className="flex gap-3 ml-4">
+                  <button onClick={() => handleShareEntry(entry)} className="text-gray-400 hover:text-purple-500 transition-colors" title="공유하기">
+                    <Share2 size={20} />
+                  </button>
+                  <button onClick={() => handleEditEntry(entry.id)} className="text-gray-400 hover:text-blue-500 transition-colors" title="수정">
+                    <Edit size={20} />
+                  </button>
+                  <button onClick={() => handleDeleteDiary(entry.id)} className="text-gray-400 hover:text-red-500 transition-colors" title="삭제">
+                    <Trash2 size={20} />
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <button onClick={() => handleEditEntry(entry.id)} className="text-gray-500 hover:text-blue-500">
-                  <Edit size={20} />
-                </button>
-                <button onClick={() => handleDeleteDiary(entry.id)} className="text-gray-500 hover:text-red-500">
-                  <Trash2 size={20} />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
+
+      {/* 공유 모달 */}
+      <ShareModal
+        isOpen={!!shareModalEntry}
+        onClose={() => setShareModalEntry(null)}
+        entry={shareModalEntry}
+      />
     </div>
   );
 };

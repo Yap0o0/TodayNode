@@ -53,16 +53,18 @@ const getAccessToken = async () => {
  * Spotify에서 음악을 검색합니다.
  * @param {string} query - 검색어 (예: 아티스트, 곡 제목)
  * @param {string} type - 검색할 타입 (track, artist 등)
+ * @param {string} type - 검색할 타입 (track, artist 등)
  * @param {number} limit - 가져올 결과의 최대 개수
+ * @param {number} offset - 검색 결과의 시작 인덱스 (기본값 0)
  * @returns {Promise<Array>} 검색 결과 배열
  */
-export const searchSpotify = async (query, type = 'track', limit = 5) => {
+export const searchSpotify = async (query, type = 'track', limit = 5, offset = 0) => {
   const token = await getAccessToken();
   if (!token) {
     return [];
   }
 
-  const searchUrl = `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(query)}&type=${type}&limit=${limit}`;
+  const searchUrl = `${SPOTIFY_API_URL}/search?q=${encodeURIComponent(query)}&type=${type}&limit=${limit}&offset=${offset}`;
 
   const { data, error } = await safeFetch(searchUrl, {
     headers: {

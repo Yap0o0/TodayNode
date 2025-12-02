@@ -34,7 +34,8 @@
 .react-calendar__month-view__weekdays {
   text-align: center;
   font-weight: bold;
-  color: #a0aec0; /* gray-500 */
+  color: #a0aec0;
+  /* gray-500 */
 }
 
 .react-calendar__month-view__days__day {
@@ -47,11 +48,13 @@
 }
 
 .react-calendar__month-view__days__day--weekend {
-  color: #f56565; /* red-500 */
+  color: #f56565;
+  /* red-500 */
 }
 
 .react-calendar__month-view__days__day--neighboringMonth {
-  color: #cbd5e0; /* gray-400 */
+  color: #cbd5e0;
+  /* gray-400 */
 }
 
 .react-calendar__tile {
@@ -61,33 +64,64 @@
   border-radius: 0.5rem;
   transition: all 0.2s;
   height: 100%;
+  position: relative;
+  /* For absolute positioning of background div */
 }
 
 .react-calendar__tile:enabled:hover,
 .react-calendar__tile:enabled:focus {
-  background: #f7fafc; /* gray-100 */
+  background: #f7fafc;
+  /* gray-100 */
 }
 
 .react-calendar__tile--now {
-  background: #f0e6ff; /* purple-100 */
+  background: #f0e6ff;
+  /* purple-100 */
 }
 
+/* Active tile overrides - Removed purple background as requested */
 .react-calendar__tile--active {
-  background: #8b5cf6 !important; /* purple-600 */
-  color: white;
+  background: transparent !important;
+  color: inherit !important;
+  font-weight: bold;
 }
 
 .react-calendar__tile--active:enabled:hover,
 .react-calendar__tile--active:enabled:focus {
-  background: #7c3aed; /* purple-700 */
+  background: #f7fafc;
+  /* Light gray on hover */
 }
 
 .react-calendar__tile abbr {
   font-size: 0.9em;
+  position: relative;
+  z-index: 2;
+  /* Ensure text is above the background div */
 }
 
 /* Custom: For adding emojis */
 .day-emoji {
   font-size: 1.2em;
   margin-top: 0.2em;
+  z-index: 1;
+  /* 이모지가 배경 위에 오도록 */
+}
+
+/* Mood Tile Styling (Solid Background) */
+.mood-tile {
+  /* No specific styles needed here as inline styles handle the background */
+}
+
+/* Records exist on this day - Text Color Override */
+.react-calendar__tile.has-mood-record {
+  color: inherit !important;
+  /* Revert to default text color (black/gray) */
+  font-weight: bold;
+}
+
+.react-calendar__tile.has-mood-record abbr {
+  position: relative;
+  z-index: 2;
+  /* Ensure text is above the background div */
+  /* No text shadow needed for white background */
 }

@@ -1,9 +1,108 @@
+@import url('https://fonts.googleapis.com/css2?family=Gamja+Flower&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --bg-paper: #FFFEF5;
+  --text-main: #4A3B32;
+  --text-sub: #8A7B72;
+
+  /* Cloud Colors */
+  --color-cloud-pink: #FADADD;
+  --color-cloud-blue: #CDEFF5;
+  --color-cloud-purple: #EFEFFA;
+  --color-cloud-mint: #DFF5F5;
+
+  /* Card Backgrounds (Glassmorphism) */
+  --bg-card-pink: rgba(255, 235, 238, 0.65);
+  --bg-card-beige: rgba(252, 242, 228, 0.65);
+  --bg-card-yellow: rgba(255, 252, 220, 0.65);
+  --bg-card-mint: rgba(235, 252, 252, 0.65);
+}
+
 @layer base {
   body {
-    @apply bg-gradient-to-br from-pastel-purple/30 via-white to-pastel-pink/30 min-h-screen font-sans text-gray-900 antialiased;
+    @apply font-sans text-gray-900 antialiased;
+    font-family: 'Gamja Flower', cursive;
+    background-color: var(--bg-paper);
+    color: var(--text-main);
+    min-height: 100vh;
+    position: relative;
+    /* Custom Scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-cloud-pink) transparent;
+  }
+
+  /* Paper Texture Noise */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: -1;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply block w-full py-3 mt-4 rounded-2xl text-lg font-bold cursor-pointer transition-transform duration-200 shadow-md;
+    background: linear-gradient(135deg, var(--color-cloud-pink), #F8C8C8);
+    color: var(--text-main);
+    box-shadow: 0 4px 10px rgba(244, 194, 194, 0.4);
+  }
+
+  .btn:active {
+    transform: scale(0.98);
+  }
+
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-600 shadow-none;
+  }
+
+  .input-box {
+    @apply w-full p-3 border-2 border-transparent rounded-2xl bg-white/90 text-base mb-3 shadow-inner transition-all duration-300;
+    font-family: 'Gamja Flower', cursive;
+  }
+
+  .input-box:focus {
+    @apply outline-none bg-white;
+    border-color: var(--color-cloud-blue);
+    box-shadow: 0 0 0 3px rgba(176, 224, 230, 0.3);
+  }
+
+  .card {
+    @apply p-5 mb-5 relative z-10 transition-all duration-300;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(10px) saturate(120%);
+    border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 8px 16px rgba(74, 59, 50, 0.06), inset 0 2px 4px rgba(255, 255, 255, 0.5);
+  }
+
+  .card:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 12px 20px rgba(74, 59, 50, 0.1);
+  }
+
+  .card-pink {
+    background-color: var(--bg-card-pink);
+  }
+
+  .card-beige {
+    background-color: var(--bg-card-beige);
+  }
+
+  .card-yellow {
+    background-color: var(--bg-card-yellow);
+  }
+
+  .card-mint {
+    background-color: var(--bg-card-mint);
   }
 }

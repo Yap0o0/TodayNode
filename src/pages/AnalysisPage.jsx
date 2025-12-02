@@ -12,6 +12,7 @@ import {
   Legend,
 } from 'chart.js';
 import { useHabits } from '../context/HabitContext'; // useHabits import
+import BadgeList from '../components/BadgeList';
 
 ChartJS.register(
   CategoryScale,
@@ -28,7 +29,7 @@ ChartJS.register(
  * 사용자의 기분 분포를 차트로 시각화하고 AI 인사이트를 제공합니다.
  */
 const AnalysisPage = () => {
-  const { entries } = useHabits(); // HabitContext에서 데이터 가져오기
+  const { entries, badges } = useHabits(); // HabitContext에서 데이터 가져오기
 
   const moodLabels = ['행복', '신남', '편안', '그저', '우울', '화남', '기타'];
 
@@ -45,19 +46,46 @@ const AnalysisPage = () => {
     moodDistribution[a] > moodDistribution[b] ? a : b
     , '없음');
 
-  const hasEnoughRecords = entries.length >= 3;
+  const hasEnoughRecords = entries.length >= 1;
 
   const [aiInsights, setAiInsights] = React.useState(null);
   const [isLoadingInsights, setIsLoadingInsights] = React.useState(false);
 
   React.useEffect(() => {
     const fetchInsights = async () => {
-      if (entries.length >= 3) {
+      if (entries.length >= 1) {
         setIsLoadingInsights(true);
         try {
-          const { analyzeHabits } = await import('../utils/geminiApi');
-          const insights = await analyzeHabits(entries);
-          setAiInsights(insights);
+          console.log("Fetching AI insights...");
+          const { analyzeHabits, recommendMovieQuote } = await import('../utils/geminiApi');
+
+          // 오늘의 기록만 필터링
+          const today = new Date().toDateString();
+          const todaysEntries = entries.filter(entry => new Date(entry.date).toDateString() === today);
+
+          // 오늘의 최빈 감정 계산
+          let todaysMood = null;
+          if (todaysEntries.length > 0) {
+            const moodCounts = todaysEntries.reduce((acc, entry) => {
+              acc[entry.mood] = (acc[entry.mood] || 0) + 1;
+              return acc;
+            }, {});
+            todaysMood = Object.keys(moodCounts).reduce((a, b) => moodCounts[a] > moodCounts[b] ? a : b);
+          }
+
+          // 명대사 추천을 위한 타겟 감정 설정 (오늘 기록 없으면 전체 최빈 감정 사용)
+          const targetMood = todaysMood || mostFrequentMood;
+          console.log("Target Mood for Quote:", targetMood);
+
+          const [insights, movieQuote] = await Promise.all([
+            analyzeHabits(entries),
+            recommendMovieQuote(todaysEntries.length > 0 ? todaysEntries : entries, targetMood)
+          ]);
+
+          console.log("Insights fetched:", insights);
+          console.log("Movie Quote fetched:", movieQuote);
+
+          setAiInsights({ ...insights, movieQuote });
         } catch (error) {
           console.error("Failed to fetch insights:", error);
         } finally {
@@ -156,59 +184,92 @@ const AnalysisPage = () => {
   };
 
   return (
-    <div className="analysis-page p-4">
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h3 className="text-xl font-semibold mb-3">감정 분포</h3>
-        <p className="text-gray-600 mb-4">기분별 기록 횟수를 확인하세요</p>
+    <div className="analysis-page p-4 pb-24">
+      <div className="card card-pink mb-6">
+        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">감정 분포</h3>
+        <p className="text-[var(--text-sub)] mb-4">기분별 기록 횟수를 확인하세요</p>
         <Line data={chartData} options={chartOptions} plugins={[emojiPlugin]} />
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <h3 className="text-xl font-semibold mb-3">AI 인사이트</h3>
+      <div className="card card-beige mb-6">
+        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">나의 성취</h3>
+        <BadgeList badges={badges} />
+      </div>
+
+      <div className="card card-yellow mb-6">
+        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">AI 인사이트</h3>
         {hasEnoughRecords ? (
           isLoadingInsights ? (
             <div className="flex justify-center items-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              <span className="ml-3 text-gray-600">AI가 기록을 분석 중입니다...</span>
+              <span className="ml-3 text-[var(--text-sub)]">AI가 기록을 분석 중입니다...</span>
             </div>
           ) : aiInsights ? (
             <div className="space-y-4">
               <div>
-                <p className="font-medium text-lg mb-2">태그-감정 분석</p>
-                <ul className="list-disc pl-5 text-gray-700">
+                <p className="font-medium text-lg mb-2 text-[var(--text-main)]">태그-감정 분석</p>
+                <ul className="list-disc pl-5 text-[var(--text-main)]">
                   {aiInsights.tagEmotion.map((insight, index) => (
                     <li key={index}>{insight}</li>
                   ))}
                 </ul>
               </div>
               <div>
-                <p className="font-medium text-lg mb-2">음악 취향 분석</p>
-                <ul className="list-disc pl-5 text-gray-700">
+                <p className="font-medium text-lg mb-2 text-[var(--text-main)]">음악 취향 분석</p>
+                <ul className="list-disc pl-5 text-[var(--text-main)]">
                   {aiInsights.musicTaste.map((insight, index) => (
                     <li key={index}>{insight}</li>
                   ))}
                 </ul>
               </div>
-              <div className="p-4 bg-purple-50 rounded-lg text-purple-800 font-medium">
+              <div className="p-4 bg-white/50 rounded-lg text-[var(--text-main)] font-medium border border-white/60">
                 <p>{aiInsights.overall}</p>
               </div>
             </div>
           ) : (
-            <div className="text-center text-gray-500 py-8">
+            <div className="text-center text-[var(--text-sub)] py-8">
               <p>분석 결과를 불러오지 못했습니다.</p>
             </div>
           )
         ) : (
-          <div className="text-center text-gray-500 py-8">
-            <p className="text-lg mb-2">데이터를 분석하려면 최소 3개 이상의 기록이 필요해요!</p>
+          <div className="text-center text-[var(--text-sub)] py-8">
+            <p className="text-lg mb-2">데이터를 분석하려면 최소 1개 이상의 기록이 필요해요!</p>
             <p className="text-sm">현재 기록 {entries.length}개</p>
           </div>
         )}
       </div>
 
-      <div className="bg-white rounded-lg shadow-md p-6">
-        <h3 className="text-xl font-semibold mb-3">요약</h3>
-        <p className="text-gray-700">
+      <div className="card card-mint mb-6">
+        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">오늘의 영화 명대사</h3>
+        {hasEnoughRecords ? (
+          isLoadingInsights ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              <span className="ml-3 text-[var(--text-sub)]">당신을 위한 명대사를 찾고 있어요...</span>
+            </div>
+          ) : aiInsights && aiInsights.movieQuote ? (
+            <div className="text-center p-6 bg-white/50 rounded-xl border border-white/60">
+              <p className="text-xl font-serif text-[var(--text-main)] mb-4 italic">"{aiInsights.movieQuote.quote}"</p>
+              <p className="text-[var(--text-sub)] font-medium mb-2">- 영화 &lt;{aiInsights.movieQuote.movie}&gt; 중 -</p>
+              <p className="text-sm text-purple-600 bg-purple-50 inline-block px-3 py-1 rounded-full mt-2">
+                💡 {aiInsights.movieQuote.reason}
+              </p>
+            </div>
+          ) : (
+            <div className="text-center text-[var(--text-sub)] py-8">
+              <p>명대사를 불러오지 못했습니다.</p>
+            </div>
+          )
+        ) : (
+          <div className="text-center text-[var(--text-sub)] py-8">
+            <p className="text-lg mb-2">기록이 조금 더 쌓이면 명대사를 추천해드릴게요!</p>
+          </div>
+        )}
+      </div>
+
+      <div className="card card-pink">
+        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">요약</h3>
+        <p className="text-[var(--text-main)]">
           총 {entries.length}개의 기록이 있습니다. <br />
           {entries.length > 0 ? (
             <>
