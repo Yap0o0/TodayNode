@@ -79,17 +79,23 @@ const AnalysisPage = () => {
         if (cachedData) {
           try {
             const parsedCache = JSON.parse(cachedData);
-            console.log("✅ Using cached AI insights for key:", cacheKey);
-            setAiInsights(parsedCache);
 
-            // 캐시된 명대사가 있으면 최근 목록에도 추가 (UI 동기화)
-            if (parsedCache.movieQuote && parsedCache.movieQuote.quote) {
-              setRecentQuotes(prev => {
-                const newRecent = [parsedCache.movieQuote.quote, ...prev].slice(0, 10);
-                return [...new Set(newRecent)];
-              });
+            // 캐시 데이터 유효성 검사 (movieQuote가 있어야 함)
+            if (parsedCache && parsedCache.movieQuote) {
+              console.log("✅ Using cached AI insights for key:", cacheKey);
+              setAiInsights(parsedCache);
+
+              // 캐시된 명대사가 있으면 최근 목록에도 추가 (UI 동기화)
+              if (parsedCache.movieQuote && parsedCache.movieQuote.quote) {
+                setRecentQuotes(prev => {
+                  const newRecent = [parsedCache.movieQuote.quote, ...prev].slice(0, 10);
+                  return [...new Set(newRecent)];
+                });
+              }
+              return; // API 호출 건너뜀
+            } else {
+              console.log("⚠️ Cache found but missing movieQuote. Fetching fresh data...");
             }
-            return; // API 호출 건너뜀
           } catch (e) {
             console.error("Cache parsing failed:", e);
             localStorage.removeItem(cacheKey); // 깨진 캐시 삭제
@@ -424,6 +430,7 @@ const AnalysisPage = () => {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         entry={todayEntry}
+        movieQuote={aiInsights?.movieQuote}
       />
     </div>
   );
