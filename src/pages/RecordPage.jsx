@@ -45,6 +45,7 @@ const RecordPage = () => {
   const [recommendedMusic, setRecommendedMusic] = useState([]);
   const [selectedMusic, setSelectedMusic] = useState(null);
   const [isLoadingMusic, setIsLoadingMusic] = useState(false);
+  const [customEmoji, setCustomEmoji] = useState(null); // 기타 기분용 커스텀 이모지
 
   // 테마 색상 상태 (기본값: 노랑)
   const [themeColor, setThemeColor] = useState('#FCD34D');
@@ -246,7 +247,7 @@ const RecordPage = () => {
       soso: { label: '그저', emoji: '😐' },
       depressed: { label: '우울' },
       angry: { label: '화남' },
-      etc: { label: '기타' },
+      etc: { label: '기타', emoji: customEmoji || '❓' },
     };
     const currentMood = moodMap[selectedMood] || { label: '알 수 없음', emoji: '❓' };
 
@@ -272,6 +273,7 @@ const RecordPage = () => {
     setRecommendedMusic([]);
     setSelectedMusic(null);
     setThemeColor('#FCD34D'); // 색상 초기화
+    setCustomEmoji(null);
   };
 
   const handleCancel = () => {
@@ -282,6 +284,7 @@ const RecordPage = () => {
     setRecommendedMusic([]);
     setSelectedMusic(null);
     setThemeColor('#FCD34D');
+    setCustomEmoji(null);
   };
 
   if (!isRecording) {
@@ -329,24 +332,24 @@ const RecordPage = () => {
               테마
             </Button>
             {showColorPicker && (
-              <div className="absolute top-full right-0 mt-2 p-2 bg-white rounded-lg shadow-xl border border-gray-100 z-50 grid grid-cols-4 gap-2 w-48">
-                {['#FCD34D', '#F87171', '#34D399', '#60A5FA', '#A78BFA', '#F472B6', '#9CA3AF', '#FBBF24'].map(color => (
-                  <button
-                    key={color}
-                    className="w-8 h-8 rounded-full border border-gray-200 hover:scale-110 transition-transform"
-                    style={{ backgroundColor: color }}
-                    onClick={() => {
-                      setThemeColor(color);
-                      setShowColorPicker(false);
-                    }}
-                  />
-                ))}
-                <input
-                  type="color"
-                  value={themeColor}
-                  onChange={(e) => setThemeColor(e.target.value)}
-                  className="w-8 h-8 rounded-full p-0 border-none cursor-pointer"
-                />
+              <div className="absolute top-full right-0 mt-2 p-3 bg-white rounded-lg shadow-xl border border-gray-100 z-50 w-48">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600 font-medium">테마 색상 선택</span>
+                  <div className="relative group">
+                    <div className="w-8 h-8 rounded-full border border-gray-200 overflow-hidden cursor-pointer hover:scale-110 transition-transform relative">
+                      <input
+                        type="color"
+                        value={themeColor}
+                        onChange={(e) => setThemeColor(e.target.value)}
+                        className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 border-none cursor-pointer"
+                        title="원하는 색상 선택"
+                      />
+                    </div>
+                    <div className="absolute -top-1 -right-1 pointer-events-none">
+                      <Palette size={12} className="text-gray-600 bg-white rounded-full p-[1px] shadow-sm" />
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -355,7 +358,12 @@ const RecordPage = () => {
         <CardContent className="space-y-6">
           <div className="space-y-2">
             <h3 className="font-semibold text-[var(--text-main)]">오늘의 기분</h3>
-            <MoodSelector selectedMood={selectedMood} onSelectMood={handleSelectMood} />
+            <MoodSelector
+              selectedMood={selectedMood}
+              onSelectMood={handleSelectMood}
+              customEmoji={customEmoji}
+              onCustomEmojiChange={setCustomEmoji}
+            />
           </div>
 
           <div className="space-y-2">

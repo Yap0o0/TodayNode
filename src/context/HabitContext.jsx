@@ -44,7 +44,12 @@ export const HabitProvider = ({ children }) => {
 
   // 기록을 삭제하는 함수
   const deleteEntry = (id) => {
-    setEntries((prevEntries) => prevEntries.filter((entry) => entry.id !== id));
+    console.log('Deleting entry from context:', id);
+    setEntries((prevEntries) => {
+      const newEntries = prevEntries.filter((entry) => entry.id !== id);
+      console.log('Entries after delete:', newEntries.length);
+      return newEntries;
+    });
   };
 
   // 뱃지 상태 관리

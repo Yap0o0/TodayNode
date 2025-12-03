@@ -26,6 +26,10 @@ const CalendarPage = () => {
   const [editThemeColor, setEditThemeColor] = useState('#FCD34D'); // 테마 색상 수정 상태
   const [showColorPicker, setShowColorPicker] = useState(false); // 색상 피커 표시 여부
 
+  // 삭제 모달 관련 상태
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [deletingEntryId, setDeletingEntryId] = useState(null);
+
   const formatDate = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -48,8 +52,15 @@ const CalendarPage = () => {
   };
 
   const handleDeleteRecord = (id) => {
-    if (window.confirm('정말로 이 기록을 삭제하시겠습니까?')) {
-      deleteEntry(id);
+    setDeletingEntryId(id);
+    setIsDeleteModalOpen(true);
+  };
+
+  const confirmDelete = () => {
+    if (deletingEntryId) {
+      deleteEntry(deletingEntryId);
+      setIsDeleteModalOpen(false);
+      setDeletingEntryId(null);
     }
   };
 
@@ -294,6 +305,21 @@ const CalendarPage = () => {
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="ghost" onClick={() => setIsEditing(false)}>취소</Button>
             <Button onClick={handleSaveEdit}>저장</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* 삭제 확인 모달 */}
+      <Modal
+        isOpen={isDeleteModalOpen}
+        onClose={() => setIsDeleteModalOpen(false)}
+        title="기록 삭제"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600">정말로 이 기록을 삭제하시겠습니까?</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setIsDeleteModalOpen(false)}>취소</Button>
+            <Button onClick={confirmDelete} className="bg-red-500 hover:bg-red-600 text-white">삭제</Button>
           </div>
         </div>
       </Modal>

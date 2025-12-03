@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Settings, Bell } from 'lucide-react';
 import TabNav from './TabNav';
+import SettingsModal from './SettingsModal';
 
 /**
  * 앱의 메인 레이아웃을 정의하는 컴포넌트입니다.
@@ -7,6 +9,16 @@ import TabNav from './TabNav';
  * 배경에 구름 효과와 종이 질감이 적용됩니다.
  */
 const Layout = ({ children }) => {
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+
+  const handleNotificationClick = () => {
+    // 알림 버튼 클릭 시 설정 모달의 알림 섹션을 보여주거나, 
+    // 간단히 권한 요청을 수행할 수 있습니다. 
+    // 여기서는 설정 모달을 열도록 유도하거나, 직접 권한 요청을 할 수도 있습니다.
+    // 사용자 경험상 설정 모달을 여는 것이 통합된 경험을 제공하므로 설정 모달을 엽니다.
+    setIsSettingsModalOpen(true);
+  };
+
   return (
     <div className="fixed inset-0 w-full h-full overflow-hidden flex flex-col items-center bg-[var(--bg-paper)]">
       {/* Cloud Effects */}
@@ -19,8 +31,26 @@ const Layout = ({ children }) => {
       <div className="w-full max-w-[480px] h-full flex flex-col relative bg-transparent">
 
         {/* Header */}
-        <header className="pt-8 pb-4 px-4 text-center z-20">
+        <header className="pt-8 pb-4 px-4 text-center z-20 relative flex items-center justify-center">
           <h1 className="text-2xl font-bold text-[var(--text-main)] drop-shadow-sm">하루 노드</h1>
+
+          {/* Header Buttons */}
+          <div className="absolute right-4 top-8 flex gap-2">
+            <button
+              onClick={handleNotificationClick}
+              className="p-2 rounded-full hover:bg-black/5 transition-colors text-gray-600"
+              title="알림"
+            >
+              <Bell size={24} />
+            </button>
+            <button
+              onClick={() => setIsSettingsModalOpen(true)}
+              className="p-2 rounded-full hover:bg-black/5 transition-colors text-gray-600"
+              title="설정"
+            >
+              <Settings size={24} />
+            </button>
+          </div>
         </header>
 
         {/* Main Content */}
@@ -33,6 +63,12 @@ const Layout = ({ children }) => {
           <TabNav />
         </footer>
       </div>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+      />
     </div>
   );
 };
