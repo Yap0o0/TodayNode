@@ -12,61 +12,71 @@ import { captureAndDownload, captureAndShare } from '../utils/shareUtils';
 const ShareModal = ({ isOpen, onClose, entry }) => {
     const cardRef = useRef(null);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isCapturing, setIsCapturing] = useState(false); // 캡처를 위한 확장 상태
 
     if (!isOpen || !entry) return null;
 
     const handleDownload = async () => {
         if (!cardRef.current) return;
         setIsProcessing(true);
+        setIsCapturing(true); // 1. 캡처 모드 시작 (내용 확장)
 
-        await captureAndDownload(
-            cardRef.current,
-            `haru-node-${entry.date}.png`,
-            {
-                backgroundColor: null, // 투명 배경 유지
-                style: {
-                    height: 'auto',
-                    maxHeight: 'none',
-                    overflow: 'visible',
-                    display: 'block', // line-clamp 해제
-                    textOverflow: 'clip',
-                    whiteSpace: 'pre-wrap', // 줄바꿈 유지
-                    webkitLineClamp: 'none'
-                }
+        // 렌더링 업데이트를 위해 약간의 지연 필요
+        setTimeout(async () => {
+            try {
+                await captureAndDownload(
+                    cardRef.current,
+                    `haru-node-${entry.date}.png`,
+                    {
+                        backgroundColor: null,
+                        style: {
+                            // 캡처 시 강제 스타일 (혹시 모를 대비)
+                            height: 'auto',
+                            maxHeight: 'none',
+                        }
+                    }
+                );
+            } catch (error) {
+                console.error(error);
+                alert('저장에 실패했습니다.');
+            } finally {
+                setIsCapturing(false); // 2. 캡처 모드 종료 (원상 복구)
+                setIsProcessing(false);
             }
-        );
-
-        setIsProcessing(false);
+        }, 100);
     };
 
     const handleShare = async () => {
         if (!cardRef.current) return;
         setIsProcessing(true);
+        setIsCapturing(true);
 
-        const shareData = {
-            title: '하루 노드 일기',
-            text: `[${entry.date}] 오늘의 일기: ${entry.moodEmoji} #하루노드`
-        };
+        setTimeout(async () => {
+            try {
+                const shareData = {
+                    title: '하루 노드 일기',
+                    text: `[${entry.date}] 오늘의 일기: ${entry.moodEmoji} #하루노드`
+                };
 
-        await captureAndShare(
-            cardRef.current,
-            shareData,
-            `haru-node-${entry.date}.png`,
-            {
-                backgroundColor: null, // 투명 배경 유지
-                style: {
-                    height: 'auto',
-                    maxHeight: 'none',
-                    overflow: 'visible',
-                    display: 'block', // line-clamp 해제
-                    textOverflow: 'clip',
-                    whiteSpace: 'pre-wrap', // 줄바꿈 유지
-                    webkitLineClamp: 'none'
-                }
+                await captureAndShare(
+                    cardRef.current,
+                    shareData,
+                    `haru-node-${entry.date}.png`,
+                    {
+                        backgroundColor: null,
+                        style: {
+                            height: 'auto',
+                            maxHeight: 'none',
+                        }
+                    }
+                );
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setIsCapturing(false);
+                setIsProcessing(false);
             }
-        );
-
-        setIsProcessing(false);
+        }, 100);
     };
 
     const getDynamicFontSize = (textLength) => {
@@ -104,7 +114,7 @@ const ShareModal = ({ isOpen, onClose, entry }) => {
                             className="share-card-content bg-gradient-to-br from-white to-purple-50 p-8 rounded-xl text-center w-[320px] relative overflow-hidden flex flex-col"
                             style={{
                                 border: '1px solid rgba(255,255,255,0.5)',
-                                minHeight: 'auto' // 높이 자동 조절 (기본값)
+                                minHeight: 'auto' // 높이 자동 조절
                             }}
                         >
                             {/* 데코레이션 */}
@@ -122,7 +132,8 @@ const ShareModal = ({ isOpen, onClose, entry }) => {
                                 {new Date(entry.timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
                             </p>
 
-                            <div className={`text-gray-700 leading-relaxed font-['Gamja_Flower'] mb-6 whitespace-pre-wrap break-all line-clamp-6 text-left px-2 ${fontSizeClass}`}>
+                            {/* 캡처 중일 때는 line-clamp 제거 */}
+                            <div className={`share-content-text text-gray-700 leading-relaxed font-['Gamja_Flower'] mb-6 whitespace-pre-wrap break-all text-left px-2 ${fontSizeClass} ${isCapturing ? '' : 'line-clamp-6'}`}>
                                 {entry.content}
                             </div>
 
