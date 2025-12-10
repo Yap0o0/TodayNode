@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import Calendar from 'react-calendar';
 import '../components/Calendar.css'; // Import custom calendar styles
-import { Edit, Trash2 } from 'lucide-react';
+import { Edit, Trash2, Share2 } from 'lucide-react';
 import { useHabits } from '../context/HabitContext'; // useHabits import
 import Modal from '../components/Modal';
 import MoodSelector from '../components/MoodSelector';
 import TagSelector from '../components/TagSelector';
 import { Textarea } from '../components/Textarea';
 import { Button } from '../components/Button';
+import ShareModal from '../components/ShareModal';
 
 /**
  * 캘린더 페이지 컴포넌트입니다.
@@ -29,6 +30,10 @@ const CalendarPage = () => {
   // 삭제 모달 관련 상태
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingEntryId, setDeletingEntryId] = useState(null);
+
+  // 공유 모달 관련 상태
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [sharingEntry, setSharingEntry] = useState(null);
 
   const formatDate = (date) => {
     const year = date.getFullYear();
@@ -54,6 +59,11 @@ const CalendarPage = () => {
   const handleDeleteRecord = (id) => {
     setDeletingEntryId(id);
     setIsDeleteModalOpen(true);
+  };
+
+  const handleShareRecord = (entry) => {
+    setSharingEntry(entry);
+    setIsShareModalOpen(true);
   };
 
   const confirmDelete = () => {
@@ -108,128 +118,135 @@ const CalendarPage = () => {
 
   return (
     <div className="calendar-page p-4 relative">
-      <div className="mb-6">
-        <div className="p-5 bg-white/70 backdrop-blur-md rounded-[30px] shadow-md border-2 border-white/80">
-          <Calendar
-            onChange={setSelectedDate}
-            value={selectedDate}
-            formatDay={(locale, date) => date.getDate()} // 날짜(일)만 표시
-            tileClassName={({ date, view }) => {
-              // 날짜에 기록이 있는지 확인하여 클래스 추가 (텍스트 색상 변경용 - 이번엔 필요 없을 수 있지만 유지)
-              if (view === 'month') {
-                const hasRecord = entries.some(entry => {
-                  const entryDate = new Date(entry.timestamp);
-                  return formatDate(entryDate) === formatDate(date);
-                });
-                if (hasRecord) return 'has-mood-record';
-              }
-              return null;
-            }}
-            tileContent={({ date, view }) => {
-              if (view === 'month') {
-                const recordsOnDay = entries.filter(entry => {
-                  const entryDate = new Date(entry.timestamp);
-                  return formatDate(entryDate) === formatDate(date);
-                });
-
-                if (recordsOnDay.length > 0) {
-                  // 가장 많이 등장한 기분 찾기 (빈도수 계산)
-                  const moodCounts = recordsOnDay.reduce((acc, record) => {
-                    const moodId = record.moodId || 'etc';
-                    acc[moodId] = (acc[moodId] || 0) + 1;
-                    return acc;
-                  }, {});
-
-                  let maxCount = 0;
-                  let mostFrequentMoodId = 'etc';
-
-                  Object.entries(moodCounts).forEach(([moodId, count]) => {
-                    if (count > maxCount) {
-                      maxCount = count;
-                      mostFrequentMoodId = moodId;
-                    }
+      <div className="flex flex-col md:flex-row md:gap-8 h-full">
+        {/* 왼쪽: 캘린더 */}
+        <div className="mb-6 md:mb-0 md:w-1/2 lg:w-[450px] md:shrink-0">
+          <div className="p-5 bg-white/70 backdrop-blur-md rounded-[30px] shadow-md border-2 border-white/80 sticky top-4">
+            <Calendar
+              onChange={setSelectedDate}
+              value={selectedDate}
+              formatDay={(locale, date) => date.getDate()} // 날짜(일)만 표시
+              tileClassName={({ date, view }) => {
+                // 날짜에 기록이 있는지 확인하여 클래스 추가 (텍스트 색상 변경용 - 이번엔 필요 없을 수 있지만 유지)
+                if (view === 'month') {
+                  const hasRecord = entries.some(entry => {
+                    const entryDate = new Date(entry.timestamp);
+                    return formatDate(entryDate) === formatDate(date);
+                  });
+                  if (hasRecord) return 'has-mood-record';
+                }
+                return null;
+              }}
+              tileContent={({ date, view }) => {
+                if (view === 'month') {
+                  const recordsOnDay = entries.filter(entry => {
+                    const entryDate = new Date(entry.timestamp);
+                    return formatDate(entryDate) === formatDate(date);
                   });
 
-                  // 해당 기분의 색상 가져오기 (없으면 기본값)
-                  // 우선순위: 1. 첫 번째 기록의 themeColor 2. 가장 빈도 높은 기분의 색상
-                  const firstRecord = recordsOnDay[0];
-                  const moodColor = firstRecord.themeColor || moodColors[mostFrequentMoodId] || '#A78BFA';
+                  if (recordsOnDay.length > 0) {
+                    // 가장 많이 등장한 기분 찾기 (빈도수 계산)
+                    const moodCounts = recordsOnDay.reduce((acc, record) => {
+                      const moodId = record.moodId || 'etc';
+                      acc[moodId] = (acc[moodId] || 0) + 1;
+                      return acc;
+                    }, {});
 
-                  return (
-                    <>
-                      {/* 동적 색상 테두리 (테마 적용 - 테두리만) */}
-                      <div
-                        style={{
-                          position: 'absolute',
-                          top: '2px',
-                          left: '2px',
-                          right: '2px',
-                          bottom: '2px',
-                          border: `3px solid ${moodColor}`, // 두께 조절 가능
-                          backgroundColor: 'white', // 내부는 흰색
-                          borderRadius: '12px', // 둥근 모서리
-                          zIndex: 0
-                        }}
-                      />
-                      {/* 이모지 표시 */}
-                      <span className="day-emoji" style={{ position: 'relative', zIndex: 1 }}>{recordsOnDay[0].moodEmoji}</span>
-                    </>
-                  );
+                    let maxCount = 0;
+                    let mostFrequentMoodId = 'etc';
+
+                    Object.entries(moodCounts).forEach(([moodId, count]) => {
+                      if (count > maxCount) {
+                        maxCount = count;
+                        mostFrequentMoodId = moodId;
+                      }
+                    });
+
+                    // 해당 기분의 색상 가져오기 (없으면 기본값)
+                    // 우선순위: 1. 첫 번째 기록의 themeColor 2. 가장 빈도 높은 기분의 색상
+                    const firstRecord = recordsOnDay[0];
+                    const moodColor = firstRecord.themeColor || moodColors[mostFrequentMoodId] || '#A78BFA';
+
+                    return (
+                      <>
+                        {/* 동적 색상 테두리 (테마 적용 - 테두리만) */}
+                        <div
+                          style={{
+                            position: 'absolute',
+                            top: '2px',
+                            left: '2px',
+                            right: '2px',
+                            bottom: '2px',
+                            border: `3px solid ${moodColor}`, // 두께 조절 가능
+                            backgroundColor: 'white', // 내부는 흰색
+                            borderRadius: '12px', // 둥근 모서리
+                            zIndex: 0
+                          }}
+                        />
+                        {/* 이모지 표시 */}
+                        <span className="day-emoji" style={{ position: 'relative', zIndex: 1 }}>{recordsOnDay[0].moodEmoji}</span>
+                      </>
+                    );
+                  }
                 }
-              }
-              return null;
-            }}
-          />
+                return null;
+              }}
+            />
+          </div>
         </div>
-      </div>
 
-      <div>
-        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)] pl-2 border-l-4 border-[var(--color-cloud-pink)]">
-          {selectedDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}의 기록
-        </h3>
-        {recordsForSelectedDate.length > 0 ? (
-          <div className="space-y-4">
-            {recordsForSelectedDate.map((record, index) => {
-              const colors = ['card-pink', 'card-beige', 'card-yellow', 'card-mint'];
-              const colorClass = colors[index % colors.length];
-              return (
-                <div key={record.id} className={`p-5 rounded-[20px] shadow-sm flex items-start justify-between ${colorClass}`}>
-                  <div className="flex-1">
-                    <div className="flex items-center mb-2">
-                      <span className="text-2xl mr-3">{record.moodEmoji}</span>
-                      <span className="font-bold text-lg text-[var(--text-main)]">{record.mood}</span>
-                      <span className="text-sm text-[var(--text-sub)] ml-3">
-                        {new Date(record.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                      </span>
-                    </div>
-                    <div className="flex flex-wrap gap-2 mb-2">
-                      {record.tags && record.tags.map(tag => (
-                        <span key={tag} className="px-2 py-1 bg-white/50 text-[var(--text-main)] rounded-full text-xs border border-white/50">
-                          {tag}
+        {/* 오른쪽: 기록 리스트 */}
+        <div className="flex-1 min-w-0">
+          <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)] pl-2 border-l-4 border-[var(--color-cloud-pink)]">
+            {selectedDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}의 기록
+          </h3>
+          {recordsForSelectedDate.length > 0 ? (
+            <div className="space-y-4">
+              {recordsForSelectedDate.map((record, index) => {
+                const colors = ['card-pink', 'card-beige', 'card-yellow', 'card-mint'];
+                const colorClass = colors[index % colors.length];
+                return (
+                  <div key={record.id} className={`p-5 rounded-[20px] shadow-sm flex items-start justify-between ${colorClass}`}>
+                    <div className="flex-1">
+                      <div className="flex items-center mb-2">
+                        <span className="text-2xl mr-3">{record.moodEmoji}</span>
+                        <span className="font-bold text-lg text-[var(--text-main)]">{record.mood}</span>
+                        <span className="text-sm text-[var(--text-sub)] ml-3">
+                          {new Date(record.timestamp).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
                         </span>
-                      ))}
+                      </div>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {record.tags && record.tags.map(tag => (
+                          <span key={tag} className="px-2 py-1 bg-white/50 text-[var(--text-main)] rounded-full text-xs border border-white/50">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      {record.content && (
+                        <p className="text-[var(--text-main)] mt-2 line-clamp-2">{record.content}</p>
+                      )}
                     </div>
-                    {record.content && (
-                      <p className="text-[var(--text-main)] mt-2 line-clamp-2">{record.content}</p>
-                    )}
+                    <div className="flex gap-2 ml-2">
+                      <button onClick={() => handleShareRecord(record)} className="text-gray-400 hover:text-green-500" title="공유하기">
+                        <Share2 size={20} />
+                      </button>
+                      <button onClick={() => handleEditEntry(record)} className="text-gray-400 hover:text-blue-500" title="수정하기">
+                        <Edit size={20} />
+                      </button>
+                      <button onClick={() => handleDeleteRecord(record.id)} className="text-gray-400 hover:text-red-500" title="삭제하기">
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-3 ml-2">
-                    <button onClick={() => handleEditEntry(record)} className="text-gray-400 hover:text-blue-500">
-                      <Edit size={20} />
-                    </button>
-                    <button onClick={() => handleDeleteRecord(record.id)} className="text-gray-400 hover:text-red-500">
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center p-6 bg-white/50 rounded-lg border-2 border-dashed border-gray-200">
-            <p className="text-gray-500">이 날짜에는 기록이 없습니다.</p>
-          </div>
-        )}
+                );
+              })}
+            </div>
+          ) : (
+            <div className="text-center p-6 bg-white/50 rounded-lg border-2 border-dashed border-gray-200">
+              <p className="text-gray-500">이 날짜에는 기록이 없습니다.</p>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 수정 모달 */}
@@ -323,6 +340,13 @@ const CalendarPage = () => {
           </div>
         </div>
       </Modal>
+
+      {/* 공유 모달 추가 */}
+      <ShareModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        entry={sharingEntry}
+      />
     </div>
   );
 };

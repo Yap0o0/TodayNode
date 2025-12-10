@@ -31,7 +31,13 @@ const fetchWithFallback = async (prompt) => {
       body: JSON.stringify({
         contents: [{
           parts: [{ text: prompt }]
-        }]
+        }],
+        generationConfig: {
+          temperature: 0.2, // 창의성 낮춤 (일관성 확보)
+          topK: 40,
+          topP: 0.95,
+          maxOutputTokens: 2048,
+        }
       }),
     });
 
@@ -146,13 +152,23 @@ export const analyzeHabits = async (entries) => {
     return null;
   }
 
-  // 최근 7일 데이터만 필터링
-  const recentEntries = entries.slice(0, 7).map(e =>
-    `- 날짜: ${new Date(e.timestamp).toLocaleDateString()} / 기분: ${e.mood} / 태그: ${e.tags ? e.tags.join(', ') : '없음'} / 내용: ${e.content || '없음'}`
-  ).join('\n');
+  // 날짜 내림차순(최신순) 정렬
+  const sortedEntries = [...entries].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+  // 최근 30일 데이터 분석 (토큰 제한 고려하여 최대 30개로 확장)
+  // 데이터가 많을 경우 content를 요약하거나 길이를 제한하는 것이 좋음
+  const recentEntries = sortedEntries.slice(0, 30).map(e => {
+    const date = new Date(e.timestamp).toLocaleDateString();
+    const tags = e.tags ? e.tags.join(', ') : '없음';
+    // 내용은 50자로 제한하여 토큰 절약
+    const content = e.content ? (e.content.length > 50 ? e.content.substring(0, 50) + '...' : e.content) : '없음';
+    return `- ${date} / 기분: ${e.mood} / 태그: ${tags} / 내용: ${content}`;
+  }).join('\n');
+
+  console.log(`Analyzing ${sortedEntries.slice(0, 30).length} entries for AI insights.`);
 
   const prompt = `
-    다음은 사용자의 최근 7일간의 일기 및 기분 기록이야:
+    다음은 사용자의 최근 일기 및 기분 기록이야 (최신순):
     ${recentEntries}
 
     이 기록을 바탕으로 다음 3가지 항목을 분석해서 JSON 형식으로 줘.

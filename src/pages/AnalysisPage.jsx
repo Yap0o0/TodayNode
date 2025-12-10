@@ -1,9 +1,10 @@
 // src/pages/AnalysisPage.jsx
-import React from 'react';
+import React, { useRef } from 'react';
 import { Line } from 'react-chartjs-2';
 import { RefreshCw, Film, Share2 } from 'lucide-react';
 import { recommendMovieQuote } from '../utils/geminiApi';
 import DailyCardModal from '../components/DailyCardModal';
+import html2canvas from 'html2canvas'; // Import html2canvas
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -30,9 +31,16 @@ ChartJS.register(
 /**
  * 분석 페이지 컴포넌트입니다.
  * 사용자의 기분 분포를 차트로 시각화하고 AI 인사이트를 제공합니다.
+ * 각 섹션별 공유 기능을 제공합니다.
  */
 const AnalysisPage = () => {
   const { entries, badges } = useHabits(); // HabitContext에서 데이터 가져오기
+
+  // 섹션별 캡처를 위한 Refs
+  const moodChartRef = useRef(null);
+  const aiInsightRef = useRef(null);
+  const summaryRef = useRef(null);
+  const movieQuoteRef = useRef(null);
 
   const moodLabels = ['행복', '신남', '편안', '그저', '우울', '화남', '기타'];
 
@@ -66,13 +74,13 @@ const AnalysisPage = () => {
     const fetchInsights = async () => {
       if (entries.length >= 1) {
         // 1. 현재 데이터 상태 계산 (캐시 키 생성용)
-        // entries는 시간순(오래된 순)으로 저장되므로 마지막 요소가 가장 최신입니다.
-        const latestEntry = entries[entries.length - 1];
-        const latestEntryTimestamp = latestEntry ? new Date(latestEntry.timestamp || latestEntry.date).getTime() : 0;
+        // entries 내의 모든 항목 중 가장 최신 수정 시간을 찾습니다.
+        const maxTimestamp = entries.reduce((max, entry) => {
+          const time = new Date(entry.timestamp || entry.date).getTime();
+          return time > max ? time : max;
+        }, 0);
         const totalEntries = entries.length;
-        const cacheKey = `ai_insights_cache_${totalEntries}_${latestEntryTimestamp}`;
-
-        console.log("Cache Key Generation:", { totalEntries, latestEntryTimestamp, cacheKey });
+        const cacheKey = `ai_insights_cache_${totalEntries}_${maxTimestamp}`;
 
         // 2. 캐시 확인
         const cachedData = localStorage.getItem(cacheKey);
@@ -82,7 +90,6 @@ const AnalysisPage = () => {
 
             // 캐시 데이터 유효성 검사 (movieQuote가 있어야 함)
             if (parsedCache && parsedCache.movieQuote) {
-              console.log("✅ Using cached AI insights for key:", cacheKey);
               setAiInsights(parsedCache);
 
               // 캐시된 명대사가 있으면 최근 목록에도 추가 (UI 동기화)
@@ -93,21 +100,15 @@ const AnalysisPage = () => {
                 });
               }
               return; // API 호출 건너뜀
-            } else {
-              console.log("⚠️ Cache found but missing movieQuote. Fetching fresh data...");
             }
           } catch (e) {
-            console.error("Cache parsing failed:", e);
             localStorage.removeItem(cacheKey); // 깨진 캐시 삭제
           }
-        } else {
-          console.log("❌ No cache found for key:", cacheKey);
         }
 
         // 3. 캐시 없거나 불일치 시 API 호출
         setIsLoadingInsights(true);
         try {
-          console.log("Fetching new AI insights from API...");
           const { analyzeHabits, recommendMovieQuote } = await import('../utils/geminiApi');
 
           // 오늘의 기록만 필터링
@@ -126,7 +127,6 @@ const AnalysisPage = () => {
 
           // 명대사 추천을 위한 타겟 감정 설정
           const targetMood = todaysMood || mostFrequentMood;
-          console.log("Target Mood for Quote:", targetMood);
 
           const results = await Promise.allSettled([
             analyzeHabits(entries),
@@ -135,9 +135,6 @@ const AnalysisPage = () => {
 
           const insightsResult = results[0];
           const movieQuoteResult = results[1];
-
-          console.log("Insights Result:", insightsResult);
-          console.log("Movie Quote Result:", movieQuoteResult);
 
           const insights = insightsResult.status === 'fulfilled' ? insightsResult.value : null;
           const movieQuote = movieQuoteResult.status === 'fulfilled' ? movieQuoteResult.value : null;
@@ -153,9 +150,6 @@ const AnalysisPage = () => {
 
           // 4. 결과 상태 업데이트 및 캐시 저장
           setAiInsights(finalData);
-
-          // 이전 캐시 정리 (선택사항: 용량 관리를 위해 모든 키를 지우고 현재 키만 저장할 수도 있음)
-          // 여기서는 간단하게 현재 키로 저장
           localStorage.setItem(cacheKey, JSON.stringify(finalData));
 
           // 초기 명대사도 최근 목록에 추가
@@ -204,6 +198,47 @@ const AnalysisPage = () => {
       console.error("Failed to refresh quote:", error);
     } finally {
       setIsLoadingQuote(false);
+    }
+  };
+
+  // 섹션 공유 핸들러
+  const handleShareSection = async (ref, fileName) => {
+    if (!ref.current) return;
+    try {
+      // 배경색을 흰색으로 지정하거나 투명하게 하여 캡처
+      const canvas = await html2canvas(ref.current, {
+        scale: 2,
+        backgroundColor: null // 투명 배경 또는 '#ffffff'
+      });
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+        const file = new File([blob], `${fileName}.png`, { type: 'image/png' });
+
+        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({
+              title: 'Haru Node Analysis',
+              text: `${fileName} 공유`,
+              files: [file]
+            });
+          } catch (err) {
+            console.log('Share canceled', err);
+          }
+        } else {
+          // 다운로드 폴백
+          const link = document.createElement('a');
+          link.href = canvas.toDataURL('image/png');
+          link.download = `${fileName}.png`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          // alert('이미지가 저장되었습니다.'); // 알림 생략
+        }
+      }, 'image/png');
+    } catch (e) {
+      console.error('Share failed:', e);
+      alert('공유에 실패했습니다.');
     }
   };
 
@@ -276,7 +311,7 @@ const AnalysisPage = () => {
       const meta = chart.getDatasetMeta(0);
 
       ctx.save();
-      ctx.font = '30px Arial'; // 이모지 크기 확대
+      ctx.font = '24px Arial'; // 이모지 크기 확대
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
 
@@ -286,7 +321,7 @@ const AnalysisPage = () => {
           const moodLabel = data.labels[index];
           const emoji = moodEmojis[moodLabel] || '❓';
           // 포인트 위에 이모지 그리기 (y축 좌표에서 조금 위로)
-          ctx.fillText(emoji, point.x, point.y - 20);
+          ctx.fillText(emoji, point.x, point.y - 15);
         }
       });
       ctx.restore();
@@ -305,127 +340,168 @@ const AnalysisPage = () => {
             onClick={() => setIsShareModalOpen(true)}
             className="flex items-center gap-1 px-3 py-2 rounded-full bg-white shadow-sm text-pink-500 border border-pink-200 hover:bg-pink-50 transition-colors text-sm font-medium"
           >
-            <Share2 size={16} /> 공유하기
+            <Share2 size={16} /> 오늘의 카드
           </button>
         )}
       </div>
 
-      <div className="card card-pink mb-6">
-        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">감정 분포</h3>
-        <p className="text-[var(--text-sub)] mb-4">기분별 기록 횟수를 확인하세요</p>
-        <Line data={chartData} options={chartOptions} plugins={[emojiPlugin]} />
-      </div>
-
-      <div className="card card-beige mb-6">
-        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">나의 성취</h3>
-        <BadgeList badges={badges} />
-      </div>
-
-      <div className="card card-yellow mb-6">
-        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">AI 인사이트</h3>
-        {hasEnoughRecords ? (
-          isLoadingInsights ? (
-            <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              <span className="ml-3 text-[var(--text-sub)]">AI가 기록을 분석 중입니다...</span>
+      {/* 감정 분포 카드 */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div ref={moodChartRef} className="card card-pink mb-6 md:mb-0 h-full">
+          <div className="flex justify-between items-center mb-3">
+            <div>
+              <h3 className="text-xl font-semibold text-[var(--text-main)]">감정 분포</h3>
+              <p className="text-[var(--text-sub)] text-sm">기분별 기록 횟수를 확인하세요</p>
             </div>
-          ) : aiInsights ? (
-            <div className="space-y-4">
-              <div>
-                <p className="font-medium text-lg mb-2 text-[var(--text-main)]">태그-감정 분석</p>
-                <ul className="list-disc pl-5 text-[var(--text-main)]">
-                  {aiInsights.tagEmotion && aiInsights.tagEmotion.map((insight, index) => (
-                    <li key={index}>{insight}</li>
-                  ))}
-                </ul>
-              </div>
-              <div>
-                <p className="font-medium text-lg mb-2 text-[var(--text-main)]">음악 취향 분석</p>
-                <ul className="list-disc pl-5 text-[var(--text-main)]">
-                  {aiInsights.musicTaste && aiInsights.musicTaste.map((insight, index) => (
-                    <li key={index}>{insight}</li>
-                  ))}
-                </ul>
-              </div>
-              <div className="p-4 bg-white/50 rounded-lg text-[var(--text-main)] font-medium border border-white/60">
-                <p>{aiInsights.overall}</p>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center text-[var(--text-sub)] py-8">
-              <p>분석 결과를 불러오지 못했습니다.</p>
-            </div>
-          )
-        ) : (
-          <div className="text-center text-[var(--text-sub)] py-8">
-            <p className="text-lg mb-2">데이터를 분석하려면 최소 1개 이상의 기록이 필요해요!</p>
-            <p className="text-sm">현재 기록 {entries.length}개</p>
+            <button
+              onClick={() => handleShareSection(moodChartRef, 'haru-node-mood-chart')}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/80 shadow-sm text-purple-500 border border-purple-200 hover:bg-purple-50 transition-colors text-sm font-medium"
+              title="차트 공유하기"
+            >
+              <Share2 size={14} /> 공유
+            </button>
           </div>
-        )}
-      </div>
-
-      <div className="card card-mint mb-6 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-          <Film size={100} />
-        </div>
-        <div className="flex justify-between items-center mb-4 relative z-10">
-          <h3 className="text-xl font-semibold text-[var(--text-main)] flex items-center gap-2">
-            <Film className="text-purple-500" size={24} />
-            오늘의 영화 명대사
-          </h3>
-          <button
-            onClick={handleRefreshQuote}
-            disabled={isLoadingQuote}
-            className={`p-2 rounded-full hover:bg-white/50 transition-colors ${isLoadingQuote ? 'animate-spin' : ''}`}
-            title="새로운 명대사 추천"
-          >
-            <RefreshCw size={20} className="text-gray-600" />
-          </button>
+          <div className="bg-white/50 rounded-xl p-2">
+            <Line data={chartData} options={chartOptions} plugins={[emojiPlugin]} />
+          </div>
         </div>
 
-        {hasEnoughRecords ? (
-          isLoadingInsights || isLoadingQuote ? (
-            <div className="flex justify-center items-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-              <span className="ml-3 text-[var(--text-sub)]">
-                {isLoadingQuote ? "새로운 명대사를 찾고 있어요..." : "당신을 위한 명대사를 찾고 있어요..."}
-              </span>
-            </div>
-          ) : aiInsights && aiInsights.movieQuote ? (
-            <div className="text-center p-6 bg-white/50 rounded-xl border border-white/60 relative z-10">
-              <p className="text-xl font-serif text-[var(--text-main)] mb-4 italic">"{aiInsights.movieQuote.quote}"</p>
-              <p className="text-[var(--text-sub)] font-medium mb-2">- 영화 &lt;{aiInsights.movieQuote.movie}&gt; 중 -</p>
-              <p className="text-sm text-purple-600 bg-purple-50 inline-block px-3 py-1 rounded-full mt-2">
-                💡 {aiInsights.movieQuote.reason}
-              </p>
-            </div>
-          ) : (
-            <div className="text-center text-[var(--text-sub)] py-8">
-              <p>명대사를 불러오지 못했습니다.</p>
-            </div>
-          )
-        ) : (
-          <div className="text-center text-[var(--text-sub)] py-8">
-            <p className="text-lg mb-2">기록이 조금 더 쌓이면 명대사를 추천해드릴게요!</p>
+        <div className="space-y-6">
+          <div className="card card-beige">
+            <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">나의 성취</h3>
+            <BadgeList badges={badges} />
           </div>
-        )}
+
+          {/* AI 인사이트 카드 */}
+          <div ref={aiInsightRef} className="card card-yellow h-fit">
+            <div className="flex justify-between items-center mb-3">
+              <h3 className="text-xl font-semibold text-[var(--text-main)]">AI 인사이트</h3>
+              <button
+                onClick={() => handleShareSection(aiInsightRef, 'haru-node-ai-insight')}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/80 shadow-sm text-yellow-600 border border-yellow-200 hover:bg-yellow-50 transition-colors text-sm font-medium"
+                title="인사이트 공유하기"
+              >
+                <Share2 size={14} /> 공유
+              </button>
+            </div>
+            {hasEnoughRecords ? (
+              isLoadingInsights ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  <span className="ml-3 text-[var(--text-sub)]">AI가 기록을 분석 중입니다...</span>
+                </div>
+              ) : aiInsights ? (
+                <div className="space-y-4">
+                  <div>
+                    <p className="font-medium text-lg mb-2 text-[var(--text-main)]">태그-감정 분석</p>
+                    <ul className="list-disc pl-5 text-[var(--text-main)] space-y-1">
+                      {aiInsights.tagEmotion && aiInsights.tagEmotion.map((insight, index) => (
+                        <li key={index} className="text-sm">{insight}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <p className="font-medium text-lg mb-2 text-[var(--text-main)]">음악 취향 분석</p>
+                    <ul className="list-disc pl-5 text-[var(--text-main)] space-y-1">
+                      {aiInsights.musicTaste && aiInsights.musicTaste.map((insight, index) => (
+                        <li key={index} className="text-sm">{insight}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="p-4 bg-white/50 rounded-lg text-[var(--text-main)] font-medium border border-white/60">
+                    <p className="leading-relaxed">{aiInsights.overall}</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-[var(--text-sub)] py-8">
+                  <p>분석 결과를 불러오지 못했습니다.</p>
+                </div>
+              )
+            ) : (
+              <div className="text-center text-[var(--text-sub)] py-8">
+                <p className="text-lg mb-2">데이터를 분석하려면 최소 1개 이상의 기록이 필요해요!</p>
+                <p className="text-sm">현재 기록 {entries.length}개</p>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
-      <div className="card card-pink">
-        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">요약</h3>
-        <p className="text-[var(--text-main)]">
-          총 {entries.length}개의 기록이 있습니다. <br />
-          {entries.length > 0 ? (
-            <>
-              가장 많이 느낀 감정은 <span className="font-bold text-purple-600">{mostFrequentMood}</span>입니다.
-            </>
+      {/* 영화 명대사 카드 */}
+      <div className="mt-6 space-y-6">
+        <div ref={movieQuoteRef} className="card card-mint relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+            <Film size={100} />
+          </div>
+          <div className="flex justify-between items-center mb-4 relative z-10">
+            <h3 className="text-xl font-semibold text-[var(--text-main)] flex items-center gap-2">
+              <Film className="text-purple-500" size={24} />
+              오늘의 영화 명대사
+            </h3>
+            <button
+              onClick={handleRefreshQuote}
+              disabled={isLoadingQuote}
+              className={`p-2 rounded-full hover:bg-white/50 transition-colors ${isLoadingQuote ? 'animate-spin' : ''}`}
+              title="새로운 명대사 추천"
+            >
+              <RefreshCw size={20} className="text-gray-600" />
+            </button>
+          </div>
+
+          {hasEnoughRecords ? (
+            isLoadingInsights || isLoadingQuote ? (
+              <div className="flex justify-center items-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                <span className="ml-3 text-[var(--text-sub)]">
+                  {isLoadingQuote ? "새로운 명대사를 찾고 있어요..." : "당신을 위한 명대사를 찾고 있어요..."}
+                </span>
+              </div>
+            ) : aiInsights && aiInsights.movieQuote ? (
+              <div className="text-center p-6 bg-white/50 rounded-xl border border-white/60 relative z-10">
+                <p className="text-xl font-serif text-[var(--text-main)] mb-4 italic leading-relaxed">"{aiInsights.movieQuote.quote}"</p>
+                <p className="text-[var(--text-sub)] font-medium mb-2">- 영화 &lt;{aiInsights.movieQuote.movie}&gt; 중 -</p>
+                <p className="text-sm text-purple-600 bg-purple-50 inline-block px-3 py-1 rounded-full mt-2">
+                  💡 {aiInsights.movieQuote.reason}
+                </p>
+              </div>
+            ) : (
+              <div className="text-center text-[var(--text-sub)] py-8">
+                <p>명대사를 불러오지 못했습니다.</p>
+              </div>
+            )
           ) : (
-            '아직 기록된 감정이 없습니다.'
+            <div className="text-center text-[var(--text-sub)] py-8">
+              <p className="text-lg mb-2">기록이 조금 더 쌓이면 명대사를 추천해드릴게요!</p>
+            </div>
           )}
-        </p>
+        </div>
+
+        {/* 요약 카드 */}
+        <div ref={summaryRef} className="card card-pink">
+          <div className="flex justify-between items-center mb-3">
+            <h3 className="text-xl font-semibold text-[var(--text-main)]">요약</h3>
+            <button
+              onClick={() => handleShareSection(summaryRef, 'haru-node-summary')}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/80 shadow-sm text-pink-500 border border-pink-200 hover:bg-pink-50 transition-colors text-sm font-medium"
+              title="요약 공유하기"
+            >
+              <Share2 size={14} /> 공유
+            </button>
+          </div>
+          <p className="text-[var(--text-main)] leading-relaxed">
+            총 {entries.length}개의 기록이 있습니다. <br />
+            {entries.length > 0 ? (
+              <>
+                가장 많이 느낀 감정은 <span className="font-bold text-purple-600 text-lg">{mostFrequentMood}</span>입니다.
+              </>
+            ) : (
+              '아직 기록된 감정이 없습니다.'
+            )}
+          </p>
+        </div>
       </div>
 
-      {/* 공유 카드 모달 */}
+      {/* 공유 카드 모달 (전체 카드) */}
       <DailyCardModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}

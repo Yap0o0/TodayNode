@@ -1,7 +1,7 @@
-import React, { useRef } from 'react';
-import html2canvas from 'html2canvas';
+import React, { useRef, useState } from 'react';
 import { X, Download, Share2 } from 'lucide-react';
 import { Button } from './Button';
+import { captureAndDownload, captureAndShare } from '../utils/shareUtils';
 
 /**
  * 일기 공유 모달 컴포넌트
@@ -11,156 +11,141 @@ import { Button } from './Button';
  */
 const ShareModal = ({ isOpen, onClose, entry }) => {
     const cardRef = useRef(null);
-
-    const [isProcessing, setIsProcessing] = React.useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     if (!isOpen || !entry) return null;
 
-    const captureCard = async () => {
-        if (!cardRef.current) return null;
-        try {
-            return await html2canvas(cardRef.current, {
-                scale: 2,
-                backgroundColor: null, // 투명 배경 지원 (필요 시)
-            });
-        } catch (error) {
-            console.error('캡처 실패:', error);
-            return null;
-        }
-    };
-
     const handleDownload = async () => {
+        if (!cardRef.current) return;
         setIsProcessing(true);
-        const canvas = await captureCard();
 
-        if (canvas) {
-            try {
-                // JPG로 저장
-                const image = canvas.toDataURL('image/jpeg', 0.95);
-                const link = document.createElement('a');
-                link.href = image;
-                link.download = `haru-node-${entry.date}.jpg`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                alert('이미지가 저장되었습니다!');
-            } catch (error) {
-                console.error('이미지 저장 실패:', error);
-                alert('이미지 저장에 실패했습니다.');
+        await captureAndDownload(
+            cardRef.current,
+            `haru-node-${entry.date}.png`,
+            {
+                backgroundColor: null // 투명 배경 유지
             }
-        } else {
-            alert('이미지 생성에 실패했습니다.');
-        }
+        );
+
         setIsProcessing(false);
     };
 
     const handleShare = async () => {
+        if (!cardRef.current) return;
         setIsProcessing(true);
-        const canvas = await captureCard();
 
-        if (canvas) {
-            canvas.toBlob(async (blob) => {
-                if (!blob) {
-                    alert('이미지 생성 실패');
-                    setIsProcessing(false);
-                    return;
-                }
+        const shareData = {
+            title: '하루 노드 일기',
+            text: `[${entry.date}] 오늘의 일기: ${entry.moodEmoji} #하루노드`
+        };
 
-                const file = new File([blob], `haru-node-${entry.date}.jpg`, { type: 'image/jpeg' });
+        await captureAndShare(
+            cardRef.current,
+            shareData,
+            `haru-node-${entry.date}.png`,
+            {
+                backgroundColor: null // 투명 배경 유지
+            }
+        );
 
-                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try {
-                        await navigator.share({
-                            title: '하루 노드 일기',
-                            text: `[${entry.date}] 오늘의 일기: ${entry.title}`,
-                            files: [file],
-                        });
-                    } catch (error) {
-                        console.log('공유 취소/에러:', error);
-                    }
-                } else {
-                    alert('이 기기에서는 공유 기능을 지원하지 않습니다.');
-                }
-                setIsProcessing(false);
-            }, 'image/jpeg', 0.95);
-        } else {
-            setIsProcessing(false);
-            alert('이미지 생성에 실패했습니다.');
-        }
+        setIsProcessing(false);
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md relative overflow-hidden">
-                {/* 닫기 버튼 */}
-                <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors z-10"
-                >
-                    <X size={24} />
-                </button>
-
-                <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative overflow-hidden flex flex-col max-h-[90vh]">
+                {/* 헤더 */}
+                <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-white sticky top-0 z-10">
+                    <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                         <Share2 size={24} className="text-purple-500" />
-                        오늘의 하루 공유하기
+                        카드 공유하기
                     </h3>
-
-                    {/* 캡처 영역 */}
-                    <div
-                        ref={cardRef}
-                        className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl shadow-inner mb-6 text-center border border-purple-100"
+                    <button
+                        onClick={onClose}
+                        className="text-gray-400 hover:text-gray-600 transition-colors p-1"
                     >
-                        <div className="text-4xl mb-2">{entry.moodEmoji}</div>
-                        <h4 className="text-lg font-bold text-gray-800 mb-1">{entry.title || "무제"}</h4>
-                        <p className="text-xs text-gray-500 mb-4">
-                            {new Date(entry.timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}
-                        </p>
-                        <p className="text-gray-700 leading-relaxed break-keep font-medium text-sm line-clamp-6">
-                            {entry.content}
-                        </p>
-                        <div className="mt-4 pt-4 border-t border-purple-200 flex justify-center gap-2 flex-wrap">
-                            {entry.tags && entry.tags.map(tag => (
-                                <span key={tag} className="text-xs text-purple-600 bg-white px-2 py-1 rounded-full shadow-sm">
-                                    #{tag}
-                                </span>
-                            ))}
-                        </div>
-                        <div className="mt-4 text-[10px] text-gray-400 font-serif uppercase tracking-widest">
-                            Haru Node
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50 flex flex-col items-center">
+                    {/* 캡처 영역 */}
+                    <div className="relative shadow-xl rounded-xl overflow-visible mx-auto my-4 transition-transform hover:scale-[1.02] duration-300">
+                        <div
+                            ref={cardRef}
+                            className="share-card-content bg-gradient-to-br from-white to-purple-50 p-8 rounded-xl text-center w-[320px] relative overflow-hidden"
+                            style={{ border: '1px solid rgba(255,255,255,0.5)' }}
+                        >
+                            {/* 데코레이션 */}
+                            <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-300 via-pink-300 to-yellow-300 opacity-70"></div>
+
+                            <div className="text-6xl mb-4 drop-shadow-sm transform hover:scale-110 transition-transform duration-300 cursor-default">
+                                {entry.moodEmoji}
+                            </div>
+
+                            <h4 className="text-xl font-bold text-gray-800 mb-2 font-['Gamja_Flower'] tracking-wide">
+                                {entry.title || "무제"}
+                            </h4>
+
+                            <p className="text-sm text-gray-400 mb-6 font-medium bg-white/60 inline-block px-3 py-1 rounded-full">
+                                {new Date(entry.timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
+                            </p>
+
+                            <div className="text-gray-700 leading-relaxed font-['Gamja_Flower'] text-lg mb-6 whitespace-pre-wrap break-words line-clamp-6 text-left px-2">
+                                {entry.content}
+                            </div>
+
+                            <div className="border-t border-purple-100 pt-4 flex justify-center gap-2 flex-wrap">
+                                {entry.tags && entry.tags.map(tag => (
+                                    <span key={tag} className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full font-medium">
+                                        {tag}
+                                    </span>
+                                ))}
+                            </div>
+
+                            <div className="mt-6 flex items-center justify-center gap-2 opacity-50">
+                                <span className="w-1 h-1 rounded-full bg-gray-400"></span>
+                                <span className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em]">Haru Node</span>
+                                <span className="w-1 h-1 rounded-full bg-gray-400"></span>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="flex gap-3">
-                        <Button
-                            onClick={handleDownload}
-                            disabled={isProcessing}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-600 hover:bg-gray-700 text-white"
-                        >
-                            {isProcessing ? (
-                                <span className="animate-pulse">처리 중...</span>
-                            ) : (
-                                <>
-                                    <Download size={18} />
-                                    <span>저장</span>
-                                </>
-                            )}
-                        </Button>
-                        <Button
-                            onClick={handleShare}
-                            disabled={isProcessing}
-                            className="flex-1 flex items-center justify-center gap-2 py-3"
-                        >
-                            {isProcessing ? (
-                                <span className="animate-pulse">처리 중...</span>
-                            ) : (
-                                <>
-                                    <Share2 size={18} />
-                                    <span>공유</span>
-                                </>
-                            )}
-                        </Button>
-                    </div>
+                    <p className="text-xs text-gray-400 mt-4 text-center">
+                        이미지가 갤러리에 저장되거나 공유 옵션이 열립니다.
+                    </p>
+                </div>
+
+                {/* 푸터 */}
+                <div className="p-4 bg-white border-t border-gray-100 flex gap-3 sticky bottom-0 z-10 shadow-[0_-5px_10px_rgba(0,0,0,0.02)]">
+                    <Button
+                        onClick={handleDownload}
+                        disabled={isProcessing}
+                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all"
+                    >
+                        {isProcessing ? (
+                            <span className="animate-pulse text-sm">처리 중...</span>
+                        ) : (
+                            <>
+                                <Download size={18} />
+                                <span className="font-bold">저장</span>
+                            </>
+                        )}
+                    </Button>
+                    <Button
+                        onClick={handleShare}
+                        disabled={isProcessing}
+                        className="flex-[1.5] flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl shadow-lg shadow-purple-200 transition-all"
+                    >
+                        {isProcessing ? (
+                            <span className="animate-pulse text-sm">처리 중...</span>
+                        ) : (
+                            <>
+                                <Share2 size={18} />
+                                <span className="font-bold">공유하기</span>
+                            </>
+                        )}
+                    </Button>
                 </div>
             </div>
         </div>

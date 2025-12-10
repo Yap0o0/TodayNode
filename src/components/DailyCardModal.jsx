@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import { X, Download, Music, Sparkles, Share2 } from 'lucide-react';
-import html2canvas from 'html2canvas';
 import { Button } from './Button';
+import { captureAndDownload, captureAndShare } from '../utils/shareUtils';
 
 const DailyCardModal = ({ isOpen, onClose, entry, movieQuote }) => {
     const cardRef = useRef(null);
@@ -15,79 +15,39 @@ const DailyCardModal = ({ isOpen, onClose, entry, movieQuote }) => {
 
     if (!isOpen || !entry) return null;
 
-    const captureCard = async () => {
-        if (!cardRef.current) return null;
-        try {
-            return await html2canvas(cardRef.current, {
-                scale: 2,
-                backgroundColor: null, // 투명 배경 지원 (둥근 모서리 유지)
-                useCORS: true,
-            });
-        } catch (error) {
-            console.error('캡처 실패:', error);
-            return null;
-        }
-    };
-
     const handleDownload = async () => {
+        if (!cardRef.current) return;
         setIsProcessing(true);
-        const canvas = await captureCard();
 
-        if (canvas) {
-            try {
-                // PNG로 저장 (투명 배경 지원)
-                const image = canvas.toDataURL('image/png');
-                const link = document.createElement('a');
-                link.href = image;
-                link.download = `haru-node_${Date.now()}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                alert('이미지가 저장되었습니다!');
-            } catch (error) {
-                console.error('다운로드 에러:', error);
-                alert('이미지 저장 중 오류가 발생했습니다.');
-            }
-        } else {
-            alert('이미지 생성에 실패했습니다.');
-        }
+        // 캡처 및 다운로드 (투명 배경 유지를 위해 배경색 옵션 null 처리 필요할 수 있으나 shareUtils 기본값 사용)
+        // DailyCardModal은 둥근 모서리가 있어서 투명 배경이 더 좋을 수 있음.
+        // shareUtils의 기본 배경은 흰색이지만, options로 덮어쓰기 가능
+        await captureAndDownload(
+            cardRef.current,
+            `haru-node_${Date.now()}.png`,
+            { backgroundColor: null } // 투명 배경 허용
+        );
+
         setIsProcessing(false);
     };
 
     const handleShare = async () => {
+        if (!cardRef.current) return;
         setIsProcessing(true);
-        const canvas = await captureCard();
 
-        if (canvas) {
-            // 모바일/공유: Blob -> File 사용 (PNG)
-            canvas.toBlob(async (blob) => {
-                if (!blob) {
-                    alert('이미지 생성 실패');
-                    setIsProcessing(false);
-                    return;
-                }
+        const shareData = {
+            title: '하루 노드',
+            text: `오늘 나의 기분은 ${entry.mood}! #하루노드`
+        };
 
-                const file = new File([blob], `haru-node_${Date.now()}.png`, { type: 'image/png' });
+        await captureAndShare(
+            cardRef.current,
+            shareData,
+            `haru-node_${Date.now()}.png`,
+            { backgroundColor: null } // 투명 배경 허용
+        );
 
-                if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-                    try {
-                        await navigator.share({
-                            title: '하루 노드',
-                            text: `오늘 나의 기분은 ${entry.mood}! #하루노드`,
-                            files: [file],
-                        });
-                    } catch (error) {
-                        console.log('공유 취소/에러:', error);
-                    }
-                } else {
-                    alert('이 기기에서는 공유 기능을 지원하지 않습니다.');
-                }
-                setIsProcessing(false);
-            }, 'image/png');
-        } else {
-            setIsProcessing(false);
-            alert('이미지 생성에 실패했습니다.');
-        }
+        setIsProcessing(false);
     };
 
     const { date, mood, moodEmoji, content, selectedMusic, themeColor } = entry;
