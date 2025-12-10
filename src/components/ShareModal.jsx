@@ -23,7 +23,16 @@ const ShareModal = ({ isOpen, onClose, entry }) => {
             cardRef.current,
             `haru-node-${entry.date}.png`,
             {
-                backgroundColor: null // 투명 배경 유지
+                backgroundColor: null, // 투명 배경 유지
+                style: {
+                    height: 'auto',
+                    maxHeight: 'none',
+                    overflow: 'visible',
+                    display: 'block', // line-clamp 해제
+                    textOverflow: 'clip',
+                    whiteSpace: 'pre-wrap', // 줄바꿈 유지
+                    webkitLineClamp: 'none'
+                }
             }
         );
 
@@ -44,12 +53,31 @@ const ShareModal = ({ isOpen, onClose, entry }) => {
             shareData,
             `haru-node-${entry.date}.png`,
             {
-                backgroundColor: null // 투명 배경 유지
+                backgroundColor: null, // 투명 배경 유지
+                style: {
+                    height: 'auto',
+                    maxHeight: 'none',
+                    overflow: 'visible',
+                    display: 'block', // line-clamp 해제
+                    textOverflow: 'clip',
+                    whiteSpace: 'pre-wrap', // 줄바꿈 유지
+                    webkitLineClamp: 'none'
+                }
             }
         );
 
         setIsProcessing(false);
     };
+
+    const getDynamicFontSize = (textLength) => {
+        if (!textLength) return 'text-lg';
+        if (textLength < 200) return 'text-lg'; // 기본 크기
+        if (textLength < 500) return 'text-base'; // 조금 작게
+        if (textLength < 1000) return 'text-sm'; // 더 작게
+        return 'text-xs'; // 아주 작게
+    };
+
+    const fontSizeClass = getDynamicFontSize(entry.content?.length || 0);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4 backdrop-blur-sm">
@@ -62,7 +90,7 @@ const ShareModal = ({ isOpen, onClose, entry }) => {
                     </h3>
                     <button
                         onClick={onClose}
-                        className="text-gray-400 hover:text-gray-600 transition-colors p-1"
+                        className="text-gray-400 hover:text-gray-600 transition-all hover:scale-125 p-1"
                     >
                         <X size={24} />
                     </button>
@@ -73,17 +101,20 @@ const ShareModal = ({ isOpen, onClose, entry }) => {
                     <div className="relative shadow-xl rounded-xl overflow-visible mx-auto my-4 transition-transform hover:scale-[1.02] duration-300">
                         <div
                             ref={cardRef}
-                            className="share-card-content bg-gradient-to-br from-white to-purple-50 p-8 rounded-xl text-center w-[320px] relative overflow-hidden"
-                            style={{ border: '1px solid rgba(255,255,255,0.5)' }}
+                            className="share-card-content bg-gradient-to-br from-white to-purple-50 p-8 rounded-xl text-center w-[320px] relative overflow-hidden flex flex-col"
+                            style={{
+                                border: '1px solid rgba(255,255,255,0.5)',
+                                minHeight: 'auto' // 높이 자동 조절 (기본값)
+                            }}
                         >
                             {/* 데코레이션 */}
                             <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-300 via-pink-300 to-yellow-300 opacity-70"></div>
 
-                            <div className="text-6xl mb-4 drop-shadow-sm transform hover:scale-110 transition-transform duration-300 cursor-default">
+                            <div className="text-5xl mb-3 drop-shadow-sm transform hover:scale-110 transition-transform duration-300 cursor-default">
                                 {entry.moodEmoji}
                             </div>
 
-                            <h4 className="text-xl font-bold text-gray-800 mb-2 font-['Gamja_Flower'] tracking-wide">
+                            <h4 className="text-lg font-bold text-gray-800 mb-2 font-['Gamja_Flower'] tracking-wide">
                                 {entry.title || "무제"}
                             </h4>
 
@@ -91,11 +122,11 @@ const ShareModal = ({ isOpen, onClose, entry }) => {
                                 {new Date(entry.timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
                             </p>
 
-                            <div className="text-gray-700 leading-relaxed font-['Gamja_Flower'] text-lg mb-6 whitespace-pre-wrap break-words line-clamp-6 text-left px-2">
+                            <div className={`text-gray-700 leading-relaxed font-['Gamja_Flower'] mb-6 whitespace-pre-wrap break-all line-clamp-6 text-left px-2 ${fontSizeClass}`}>
                                 {entry.content}
                             </div>
 
-                            <div className="border-t border-purple-100 pt-4 flex justify-center gap-2 flex-wrap">
+                            <div className="mt-auto pt-4 border-t border-purple-100 flex justify-center gap-2 flex-wrap">
                                 {entry.tags && entry.tags.map(tag => (
                                     <span key={tag} className="text-xs text-purple-600 bg-purple-50 px-2 py-1 rounded-full font-medium">
                                         {tag}
@@ -121,7 +152,7 @@ const ShareModal = ({ isOpen, onClose, entry }) => {
                     <Button
                         onClick={handleDownload}
                         disabled={isProcessing}
-                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all"
+                        className="flex-1 flex items-center justify-center gap-2 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl transition-all hover:scale-105 active:scale-95"
                     >
                         {isProcessing ? (
                             <span className="animate-pulse text-sm">처리 중...</span>
@@ -135,7 +166,7 @@ const ShareModal = ({ isOpen, onClose, entry }) => {
                     <Button
                         onClick={handleShare}
                         disabled={isProcessing}
-                        className="flex-[1.5] flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl shadow-lg shadow-purple-200 transition-all"
+                        className="flex-[1.5] flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl shadow-lg shadow-purple-200 transition-all hover:scale-105 active:scale-95"
                     >
                         {isProcessing ? (
                             <span className="animate-pulse text-sm">처리 중...</span>

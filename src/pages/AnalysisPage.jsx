@@ -1,10 +1,10 @@
 // src/pages/AnalysisPage.jsx
 import React, { useRef } from 'react';
 import { Line } from 'react-chartjs-2';
-import { RefreshCw, Film, Share2 } from 'lucide-react';
+import { RefreshCw, Film, Share2, Download } from 'lucide-react';
 import { recommendMovieQuote } from '../utils/geminiApi';
 import DailyCardModal from '../components/DailyCardModal';
-import html2canvas from 'html2canvas'; // Import html2canvas
+import { toBlob } from 'html-to-image';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -67,22 +67,23 @@ const AnalysisPage = () => {
 
   // 오늘 날짜 문자열 (YYYY-MM-DD)
   const todayStr = new Date().toISOString().slice(0, 10);
-  // 오늘의 기록 찾기
-  const todayEntry = entries.find(entry => entry.date && entry.date.startsWith(todayStr));
 
+  // 오늘의 기록 찾기 (최신 기록 우선)
+  // entries는 시간순 정렬이므로 끝에서부터 찾거나 필터링 후 마지막 요소 선택
+  const todaysEntries = entries.filter(entry => entry.date && entry.date.startsWith(todayStr));
+  const todayEntry = todaysEntries.length > 0 ? todaysEntries[todaysEntries.length - 1] : null;
+
+  // 캐시 키 생성 (렌더링 시 계산)
+  const latestEntry = entries.length > 0 ? entries[entries.length - 1] : null;
+  const latestEntryTimestamp = latestEntry ? new Date(latestEntry.timestamp || latestEntry.date).getTime() : 0;
+  const totalEntries = entries.length;
+  const cacheKey = `ai_insights_cache_${totalEntries}_${latestEntryTimestamp}`;
+
+  // 2. 캐시 확인 및 데이터 가져오기 (Effect)
   React.useEffect(() => {
     const fetchInsights = async () => {
       if (entries.length >= 1) {
-        // 1. 현재 데이터 상태 계산 (캐시 키 생성용)
-        // entries 내의 모든 항목 중 가장 최신 수정 시간을 찾습니다.
-        const maxTimestamp = entries.reduce((max, entry) => {
-          const time = new Date(entry.timestamp || entry.date).getTime();
-          return time > max ? time : max;
-        }, 0);
-        const totalEntries = entries.length;
-        const cacheKey = `ai_insights_cache_${totalEntries}_${maxTimestamp}`;
-
-        // 2. 캐시 확인
+        // 캐시 확인
         const cachedData = localStorage.getItem(cacheKey);
         if (cachedData) {
           try {
@@ -94,8 +95,10 @@ const AnalysisPage = () => {
 
               // 캐시된 명대사가 있으면 최근 목록에도 추가 (UI 동기화)
               if (parsedCache.movieQuote && parsedCache.movieQuote.quote) {
+                const quoteToCheck = parsedCache.movieQuote.quote;
                 setRecentQuotes(prev => {
-                  const newRecent = [parsedCache.movieQuote.quote, ...prev].slice(0, 10);
+                  if (prev.includes(quoteToCheck)) return prev; // 중복이면 상태 업데이트 방지 (루프 방지)
+                  const newRecent = [quoteToCheck, ...prev].slice(0, 10);
                   return [...new Set(newRecent)];
                 });
               }
@@ -155,6 +158,7 @@ const AnalysisPage = () => {
           // 초기 명대사도 최근 목록에 추가
           if (movieQuote && movieQuote.quote) {
             setRecentQuotes(prev => {
+              if (prev.includes(movieQuote.quote)) return prev;
               const newRecent = [movieQuote.quote, ...prev].slice(0, 10);
               return [...new Set(newRecent)];
             });
@@ -168,7 +172,7 @@ const AnalysisPage = () => {
     };
 
     fetchInsights();
-  }, [entries]); // entries가 변경될 때만 실행 (내부에서 캐시 체크)
+  }, [entries, cacheKey, mostFrequentMood]);
 
   const handleRefreshQuote = async () => {
     if (entries.length === 0) return;
@@ -201,41 +205,92 @@ const AnalysisPage = () => {
     }
   };
 
-  // 섹션 공유 핸들러
-  const handleShareSection = async (ref, fileName) => {
+  // 저장 시 배경색 강도를 위해 더 진한 색상 사용 (25% 투명도 적용 시 파스텔톤이 되도록)
+  const CARD_COLORS = {
+    pink: '#F472B6',   // Pink-400
+    beige: '#F59E0B',  // Amber-500 (Beige대용)
+    yellow: '#FCD34D', // Amber-300
+    mint: '#34D399',   // Emerald-400
+  };
+
+  // 섹션 저장(다운로드) 핸들러
+  const handleDownloadSection = async (ref, fileName, colorHex = '#ffffff') => {
     if (!ref.current) return;
     try {
-      // 배경색을 흰색으로 지정하거나 투명하게 하여 캡처
-      const canvas = await html2canvas(ref.current, {
-        scale: 2,
-        backgroundColor: null // 투명 배경 또는 '#ffffff'
+      const blob = await toBlob(ref.current, {
+        quality: 0.95,
+        backgroundColor: '#ffffff', // 배경색을 흰색으로 설정하여 투명도 있는 요소가 파스텔톤으로 보이게 함
+        filter: (node) => !node.classList?.contains('hide-on-capture'),
+        style: {
+          margin: '0',
+          borderRadius: '0',
+          boxShadow: 'none',
+          backgroundColor: `${colorHex}20`, // 요소 배경색 강제 변경 (농도 12.5%로 낮춤)
+          border: `1px solid ${colorHex}40`
+        }
       });
 
-      canvas.toBlob(async (blob) => {
-        if (!blob) return;
-        const file = new File([blob], `${fileName}.png`, { type: 'image/png' });
+      if (blob) {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+        link.href = url;
+        link.download = `${fileName}_${timestamp}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+    } catch (e) {
+      console.error('Download failed:', e);
+      alert('저장에 실패했습니다.');
+    }
+  };
 
-        if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-          try {
-            await navigator.share({
-              title: 'Haru Node Analysis',
-              text: `${fileName} 공유`,
-              files: [file]
-            });
-          } catch (err) {
-            console.log('Share canceled', err);
-          }
-        } else {
-          // 다운로드 폴백
-          const link = document.createElement('a');
-          link.href = canvas.toDataURL('image/png');
-          link.download = `${fileName}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          // alert('이미지가 저장되었습니다.'); // 알림 생략
+  // 섹션 공유 핸들러
+  const handleShareSection = async (ref, fileName, colorHex = '#ffffff') => {
+    if (!ref.current) return;
+    try {
+      // html-to-image로 배경색 지정하여 캡처
+      const blob = await toBlob(ref.current, {
+        quality: 0.95,
+        backgroundColor: '#ffffff', // 배경색을 흰색으로 설정하여 투명도 있는 요소가 파스텔톤으로 보이게 함
+        filter: (node) => !node.classList?.contains('hide-on-capture'),
+        style: {
+          margin: '0',
+          borderRadius: '0',
+          boxShadow: 'none',
+          backgroundColor: `${colorHex}20`, // 요소 배경색 강제 변경 (농도 12.5%로 낮춤)
+          border: `1px solid ${colorHex}40`
         }
-      }, 'image/png');
+      });
+
+      if (!blob) return;
+      const timestamp = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const file = new File([blob], `${fileName}_${timestamp}.png`, { type: 'image/png' });
+
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            title: 'Haru Node Analysis',
+            text: `${fileName} 공유 #하루노드`,
+            files: [file]
+          });
+        } catch (err) {
+          console.log('Share canceled', err);
+        }
+      } else {
+        // 공유가 지원되지 않으면 다운로드로 폴백
+        alert('공유 기능을 지원하지 않는 브라우저입니다. 이미지를 저장합니다.');
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${fileName}_${timestamp}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
     } catch (e) {
       console.error('Share failed:', e);
       alert('공유에 실패했습니다.');
@@ -335,109 +390,132 @@ const AnalysisPage = () => {
           <h2 className="text-2xl font-bold text-[var(--text-main)]">분석</h2>
           <p className="text-[var(--text-sub)]">나의 기록을 분석해보세요.</p>
         </div>
-        {todayEntry && (
-          <button
-            onClick={() => setIsShareModalOpen(true)}
-            className="flex items-center gap-1 px-3 py-2 rounded-full bg-white shadow-sm text-pink-500 border border-pink-200 hover:bg-pink-50 transition-colors text-sm font-medium"
-          >
-            <Share2 size={16} /> 오늘의 카드
-          </button>
-        )}
+
       </div>
 
       {/* 감정 분포 카드 */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div ref={moodChartRef} className="card card-pink mb-6 md:mb-0 h-full">
-          <div className="flex justify-between items-center mb-3">
-            <div>
-              <h3 className="text-xl font-semibold text-[var(--text-main)]">감정 분포</h3>
-              <p className="text-[var(--text-sub)] text-sm">기분별 기록 횟수를 확인하세요</p>
-            </div>
+      <div ref={moodChartRef} className="card card-pink mb-6 relative group">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <h3 className="text-xl font-semibold text-[var(--text-main)]">감정 분포</h3>
+            <p className="text-[var(--text-sub)] text-sm">기분별 기록 횟수를 확인하세요</p>
+          </div>
+          <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity hide-on-capture">
             <button
-              onClick={() => handleShareSection(moodChartRef, 'haru-node-mood-chart')}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/80 shadow-sm text-purple-500 border border-purple-200 hover:bg-purple-50 transition-colors text-sm font-medium"
-              title="차트 공유하기"
+              onClick={() => handleDownloadSection(moodChartRef, 'haru-node-mood-chart', CARD_COLORS.pink)}
+              className="p-2 hover:bg-white/50 rounded-full"
+              title="차트 저장"
             >
-              <Share2 size={14} /> 공유
+              <Download size={20} className="text-gray-500" />
+            </button>
+            <button
+              onClick={() => handleShareSection(moodChartRef, 'haru-node-mood-chart', CARD_COLORS.pink)}
+              className="p-2 hover:bg-white/50 rounded-full"
+              title="차트 공유"
+            >
+              <Share2 size={20} className="text-gray-500" />
             </button>
           </div>
-          <div className="bg-white/50 rounded-xl p-2">
-            <Line data={chartData} options={chartOptions} plugins={[emojiPlugin]} />
-          </div>
         </div>
-
-        <div className="space-y-6">
-          <div className="card card-beige">
-            <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">나의 성취</h3>
-            <BadgeList badges={badges} />
-          </div>
-
-          {/* AI 인사이트 카드 */}
-          <div ref={aiInsightRef} className="card card-yellow h-fit">
-            <div className="flex justify-between items-center mb-3">
-              <h3 className="text-xl font-semibold text-[var(--text-main)]">AI 인사이트</h3>
-              <button
-                onClick={() => handleShareSection(aiInsightRef, 'haru-node-ai-insight')}
-                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/80 shadow-sm text-yellow-600 border border-yellow-200 hover:bg-yellow-50 transition-colors text-sm font-medium"
-                title="인사이트 공유하기"
-              >
-                <Share2 size={14} /> 공유
-              </button>
-            </div>
-            {hasEnoughRecords ? (
-              isLoadingInsights ? (
-                <div className="flex justify-center items-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                  <span className="ml-3 text-[var(--text-sub)]">AI가 기록을 분석 중입니다...</span>
-                </div>
-              ) : aiInsights ? (
-                <div className="space-y-4">
-                  <div>
-                    <p className="font-medium text-lg mb-2 text-[var(--text-main)]">태그-감정 분석</p>
-                    <ul className="list-disc pl-5 text-[var(--text-main)] space-y-1">
-                      {aiInsights.tagEmotion && aiInsights.tagEmotion.map((insight, index) => (
-                        <li key={index} className="text-sm">{insight}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <p className="font-medium text-lg mb-2 text-[var(--text-main)]">음악 취향 분석</p>
-                    <ul className="list-disc pl-5 text-[var(--text-main)] space-y-1">
-                      {aiInsights.musicTaste && aiInsights.musicTaste.map((insight, index) => (
-                        <li key={index} className="text-sm">{insight}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="p-4 bg-white/50 rounded-lg text-[var(--text-main)] font-medium border border-white/60">
-                    <p className="leading-relaxed">{aiInsights.overall}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="text-center text-[var(--text-sub)] py-8">
-                  <p>분석 결과를 불러오지 못했습니다.</p>
-                </div>
-              )
-            ) : (
-              <div className="text-center text-[var(--text-sub)] py-8">
-                <p className="text-lg mb-2">데이터를 분석하려면 최소 1개 이상의 기록이 필요해요!</p>
-                <p className="text-sm">현재 기록 {entries.length}개</p>
-              </div>
-            )}
-          </div>
+        <div className="bg-white/50 rounded-xl p-2">
+          <Line data={chartData} options={chartOptions} plugins={[emojiPlugin]} />
         </div>
       </div>
 
-      {/* 영화 명대사 카드 */}
-      <div className="mt-6 space-y-6">
-        <div ref={movieQuoteRef} className="card card-mint relative overflow-hidden">
-          <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
-            <Film size={100} />
+      <div className="card card-beige mb-6">
+        <h3 className="text-xl font-semibold mb-3 text-[var(--text-main)]">나의 성취</h3>
+        <BadgeList badges={badges} />
+      </div>
+
+      {/* AI 인사이트 카드 */}
+      <div ref={aiInsightRef} className="card card-yellow mb-6 relative group">
+        <div className="flex justify-between items-start mb-3">
+          <h3 className="text-xl font-semibold text-[var(--text-main)]">AI 인사이트</h3>
+          <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity hide-on-capture">
+            <button
+              onClick={() => handleDownloadSection(aiInsightRef, 'haru-node-ai-insight', CARD_COLORS.yellow)}
+              className="p-2 hover:bg-white/50 rounded-full"
+              title="인사이트 저장"
+            >
+              <Download size={20} className="text-gray-500" />
+            </button>
+            <button
+              onClick={() => handleShareSection(aiInsightRef, 'haru-node-ai-insight', CARD_COLORS.yellow)}
+              className="p-2 hover:bg-white/50 rounded-full"
+              title="인사이트 공유"
+            >
+              <Share2 size={20} className="text-gray-500" />
+            </button>
           </div>
-          <div className="flex justify-between items-center mb-4 relative z-10">
-            <h3 className="text-xl font-semibold text-[var(--text-main)] flex items-center gap-2">
-              <Film className="text-purple-500" size={24} />
-              오늘의 영화 명대사
-            </h3>
+        </div>
+        {hasEnoughRecords ? (
+          isLoadingInsights ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              <span className="ml-3 text-[var(--text-sub)]">AI가 기록을 분석 중입니다...</span>
+            </div>
+          ) : aiInsights ? (
+            <div className="space-y-4">
+              <div>
+                <p className="font-medium text-lg mb-2 text-[var(--text-main)]">태그-감정 분석</p>
+                <ul className="list-disc pl-5 text-[var(--text-main)] space-y-1">
+                  {aiInsights.tagEmotion && aiInsights.tagEmotion.map((insight, index) => (
+                    <li key={index} className="text-sm">{insight}</li>
+                  ))}
+                </ul>
+              </div>
+              <div>
+                <p className="font-medium text-lg mb-2 text-[var(--text-main)]">음악 취향 분석</p>
+                <ul className="list-disc pl-5 text-[var(--text-main)] space-y-1">
+                  {aiInsights.musicTaste && aiInsights.musicTaste.map((insight, index) => (
+                    <li key={index} className="text-sm">{insight}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="p-4 bg-white/50 rounded-lg text-[var(--text-main)] font-medium border border-white/60">
+                <p className="leading-relaxed">{aiInsights.overall}</p>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-[var(--text-sub)] py-8">
+              <p>분석 결과를 불러오지 못했습니다.</p>
+            </div>
+          )
+        ) : (
+          <div className="text-center text-[var(--text-sub)] py-8">
+            <p className="text-lg mb-2">데이터를 분석하려면 최소 1개 이상의 기록이 필요해요!</p>
+            <p className="text-sm">현재 기록 {entries.length}개</p>
+          </div>
+        )}
+      </div>
+
+      {/* 영화 명대사 카드 */}
+      <div ref={movieQuoteRef} className="card card-mint mb-6 relative overflow-hidden group">
+        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+          <Film size={100} />
+        </div>
+        <div className="flex justify-between items-center mb-4 relative z-10">
+          <h3 className="text-xl font-semibold text-[var(--text-main)] flex items-center gap-2">
+            <Film className="text-purple-500" size={24} />
+            오늘의 영화 명대사
+          </h3>
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 opacity-50 group-hover:opacity-100 transition-opacity hide-on-capture">
+              <button
+                onClick={() => handleDownloadSection(movieQuoteRef, 'haru-node-movie-quote', CARD_COLORS.mint)}
+                className="p-2 hover:bg-white/50 rounded-full"
+                title="명대사 저장"
+              >
+                <Download size={20} className="text-gray-500" />
+              </button>
+              <button
+                onClick={() => handleShareSection(movieQuoteRef, 'haru-node-movie-quote', CARD_COLORS.mint)}
+                className="p-2 hover:bg-white/50 rounded-full"
+                title="명대사 공유"
+              >
+                <Share2 size={20} className="text-gray-500" />
+              </button>
+            </div>
             <button
               onClick={handleRefreshQuote}
               disabled={isLoadingQuote}
@@ -447,61 +525,70 @@ const AnalysisPage = () => {
               <RefreshCw size={20} className="text-gray-600" />
             </button>
           </div>
+        </div>
 
-          {hasEnoughRecords ? (
-            isLoadingInsights || isLoadingQuote ? (
-              <div className="flex justify-center items-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                <span className="ml-3 text-[var(--text-sub)]">
-                  {isLoadingQuote ? "새로운 명대사를 찾고 있어요..." : "당신을 위한 명대사를 찾고 있어요..."}
-                </span>
-              </div>
-            ) : aiInsights && aiInsights.movieQuote ? (
-              <div className="text-center p-6 bg-white/50 rounded-xl border border-white/60 relative z-10">
-                <p className="text-xl font-serif text-[var(--text-main)] mb-4 italic leading-relaxed">"{aiInsights.movieQuote.quote}"</p>
-                <p className="text-[var(--text-sub)] font-medium mb-2">- 영화 &lt;{aiInsights.movieQuote.movie}&gt; 중 -</p>
-                <p className="text-sm text-purple-600 bg-purple-50 inline-block px-3 py-1 rounded-full mt-2">
-                  💡 {aiInsights.movieQuote.reason}
-                </p>
-              </div>
-            ) : (
-              <div className="text-center text-[var(--text-sub)] py-8">
-                <p>명대사를 불러오지 못했습니다.</p>
-              </div>
-            )
+        {hasEnoughRecords ? (
+          isLoadingInsights || isLoadingQuote ? (
+            <div className="flex justify-center items-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+              <span className="ml-3 text-[var(--text-sub)]">
+                {isLoadingQuote ? "새로운 명대사를 찾고 있어요..." : "당신을 위한 명대사를 찾고 있어요..."}
+              </span>
+            </div>
+          ) : aiInsights && aiInsights.movieQuote ? (
+            <div className="text-center p-6 bg-white/50 rounded-xl border border-white/60 relative z-10">
+              <p className="text-xl font-serif text-[var(--text-main)] mb-4 italic leading-relaxed">"{aiInsights.movieQuote.quote}"</p>
+              <p className="text-[var(--text-sub)] font-medium mb-2">- 영화 &lt;{aiInsights.movieQuote.movie}&gt; 중 -</p>
+              <p className="text-sm text-purple-600 bg-purple-50 inline-block px-3 py-1 rounded-full mt-2">
+                💡 {aiInsights.movieQuote.reason}
+              </p>
+            </div>
           ) : (
             <div className="text-center text-[var(--text-sub)] py-8">
-              <p className="text-lg mb-2">기록이 조금 더 쌓이면 명대사를 추천해드릴게요!</p>
+              <p>명대사를 불러오지 못했습니다.</p>
             </div>
-          )}
-        </div>
-
-        {/* 요약 카드 */}
-        <div ref={summaryRef} className="card card-pink">
-          <div className="flex justify-between items-center mb-3">
-            <h3 className="text-xl font-semibold text-[var(--text-main)]">요약</h3>
-            <button
-              onClick={() => handleShareSection(summaryRef, 'haru-node-summary')}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/80 shadow-sm text-pink-500 border border-pink-200 hover:bg-pink-50 transition-colors text-sm font-medium"
-              title="요약 공유하기"
-            >
-              <Share2 size={14} /> 공유
-            </button>
+          )
+        ) : (
+          <div className="text-center text-[var(--text-sub)] py-8">
+            <p className="text-lg mb-2">기록이 조금 더 쌓이면 명대사를 추천해드릴게요!</p>
           </div>
-          <p className="text-[var(--text-main)] leading-relaxed">
-            총 {entries.length}개의 기록이 있습니다. <br />
-            {entries.length > 0 ? (
-              <>
-                가장 많이 느낀 감정은 <span className="font-bold text-purple-600 text-lg">{mostFrequentMood}</span>입니다.
-              </>
-            ) : (
-              '아직 기록된 감정이 없습니다.'
-            )}
-          </p>
-        </div>
+        )}
       </div>
 
-      {/* 공유 카드 모달 (전체 카드) */}
+      {/* 요약 카드 */}
+      <div ref={summaryRef} className="card card-pink mb-6 relative group">
+        <div className="flex justify-between items-start mb-3">
+          <h3 className="text-xl font-semibold text-[var(--text-main)]">요약</h3>
+          <div className="flex gap-2 opacity-50 group-hover:opacity-100 transition-opacity hide-on-capture">
+            <button
+              onClick={() => handleDownloadSection(summaryRef, 'haru-node-summary', CARD_COLORS.pink)}
+              className="p-2 hover:bg-white/50 rounded-full"
+              title="요약 저장"
+            >
+              <Download size={20} className="text-gray-500" />
+            </button>
+            <button
+              onClick={() => handleShareSection(summaryRef, 'haru-node-summary', CARD_COLORS.pink)}
+              className="p-2 hover:bg-white/50 rounded-full"
+              title="요약 공유"
+            >
+              <Share2 size={20} className="text-gray-500" />
+            </button>
+          </div>
+        </div>
+        <p className="text-[var(--text-main)] leading-relaxed">
+          총 {entries.length}개의 기록이 있습니다. <br />
+          {entries.length > 0 ? (
+            <>
+              가장 많이 느낀 감정은 <span className="font-bold text-purple-600 text-lg">{mostFrequentMood}</span>입니다.
+            </>
+          ) : (
+            '아직 기록된 감정이 없습니다.'
+          )}
+        </p>
+      </div>
+
+      {/* 공유 카드 모달 */}
       <DailyCardModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}

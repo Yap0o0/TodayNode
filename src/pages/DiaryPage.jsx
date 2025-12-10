@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PencilLine, Edit, Trash2, Sparkles, Share2 } from 'lucide-react';
+import { PencilLine, Edit, Trash2, Sparkles, Share2, Download } from 'lucide-react';
 import WriteDiaryForm from '../components/WriteDiaryForm';
 import ShareModal from '../components/ShareModal';
 import { useHabits } from '../context/HabitContext'; // useHabits import
@@ -94,7 +94,7 @@ const DiaryPage = () => {
         <div className="flex gap-2">
           <button
             onClick={handleStartWriting}
-            className="bg-purple-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md hover:bg-purple-600 transition-colors flex items-center"
+            className="bg-purple-500 text-white px-4 py-2 rounded-full text-sm font-semibold shadow-md hover:bg-purple-600 transition-all hover:scale-105 active:scale-95 flex items-center"
           >
             <PencilLine size={18} className="mr-2" /> 일기 쓰기
           </button>
@@ -119,27 +119,32 @@ const DiaryPage = () => {
             const rotation = (index % 2 === 0 ? -1 : 1) * (Math.random() * 1.5);
 
             return (
-              <div key={entry.id} className={`p-5 mb-4 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] shadow-md flex justify-between items-center transition-transform hover:scale-[1.01] ${colorClass}`} style={{ transform: `rotate(${rotation}deg)` }}>
-                <div className="flex-1">
-                  <div className="flex items-center mb-2">
-                    <span className="text-2xl mr-3">{entry.moodEmoji}</span>
-                    <span className="font-bold text-lg text-[var(--text-main)]">{entry.title}</span>
+              <div key={entry.id} className="mb-4 transition-transform duration-300 hover:z-10" style={{ transform: `rotate(${rotation}deg)` }}>
+                <div className={`p-5 rounded-[255px_15px_225px_15px/15px_225px_15px_255px] shadow-md flex justify-between items-center transition-transform duration-300 hover:scale-[1.03] ${colorClass}`} style={{ transitionTimingFunction: 'cubic-bezier(0.34, 1.56, 0.64, 1)' }}>
+                  <div className="flex-1">
+                    <div className="flex items-center mb-2">
+                      <span className="text-2xl mr-3">{entry.moodEmoji}</span>
+                      <span className="font-bold text-lg text-[var(--text-main)]">{entry.title}</span>
+                    </div>
+                    <p className="text-sm text-[var(--text-sub)] mb-2">
+                      {new Date(entry.timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} • {entry.mood}
+                    </p>
+                    <p className="text-[var(--text-main)] line-clamp-1 break-all">{entry.content}</p>
                   </div>
-                  <p className="text-sm text-[var(--text-sub)] mb-2">
-                    {new Date(entry.timestamp).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })} • {entry.mood}
-                  </p>
-                  <p className="text-[var(--text-main)] line-clamp-1">{entry.content}</p>
-                </div>
-                <div className="flex gap-3 ml-4">
-                  <button onClick={() => handleShareEntry(entry)} className="text-gray-400 hover:text-purple-500 transition-colors" title="공유하기">
-                    <Share2 size={20} />
-                  </button>
-                  <button onClick={() => handleEditEntry(entry.id)} className="text-gray-400 hover:text-blue-500 transition-colors" title="수정">
-                    <Edit size={20} />
-                  </button>
-                  <button onClick={() => handleDeleteDiary(entry.id)} className="text-gray-400 hover:text-red-500 transition-colors" title="삭제">
-                    <Trash2 size={20} />
-                  </button>
+                  <div className="flex gap-3 ml-4">
+                    <button onClick={() => handleShareEntry(entry)} className="text-gray-400 hover:text-pink-500 transition-all hover:scale-110 active:scale-95" title="이미지 저장">
+                      <Download size={20} />
+                    </button>
+                    <button onClick={() => handleShareEntry(entry)} className="text-gray-400 hover:text-purple-500 transition-all hover:scale-110 active:scale-95" title="공유하기">
+                      <Share2 size={20} />
+                    </button>
+                    <button onClick={() => handleEditEntry(entry.id)} className="text-gray-400 hover:text-blue-500 transition-all hover:scale-110 active:scale-95" title="수정">
+                      <Edit size={20} />
+                    </button>
+                    <button onClick={() => handleDeleteDiary(entry.id)} className="text-gray-400 hover:text-red-500 transition-all hover:scale-110 active:scale-95" title="삭제">
+                      <Trash2 size={20} />
+                    </button>
+                  </div>
                 </div>
               </div>
             );

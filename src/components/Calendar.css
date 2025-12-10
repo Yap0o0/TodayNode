@@ -24,6 +24,16 @@
   background: none;
   border: none;
   cursor: pointer;
+  transition: transform 0.2s ease-out;
+  /* Add animation */
+}
+
+.react-calendar__navigation button:enabled:hover,
+.react-calendar__navigation button:enabled:focus {
+  transform: scale(1.2);
+  /* Make arrows pop */
+  background-color: transparent;
+  /* Ensure no background color on hover if not desired */
 }
 
 .react-calendar__navigation__label {
@@ -107,21 +117,25 @@
   /* 이모지가 배경 위에 오도록 */
 }
 
-/* Mood Tile Styling (Solid Background) */
-.mood-tile {
-  /* No specific styles needed here as inline styles handle the background */
-}
+
 
 /* Records exist on this day - Text Color Override */
 .react-calendar__tile.has-mood-record {
   color: inherit !important;
-  /* Revert to default text color (black/gray) */
   font-weight: bold;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Bouncy transition */
+  z-index: 1;
+  /* Ensure scaling appearing above neighbors */
+}
+
+.react-calendar__tile.has-mood-record:hover {
+  transform: scale(1.15);
+  /* Keep it lively */
+  z-index: 10;
 }
 
 .react-calendar__tile.has-mood-record abbr {
   position: relative;
   z-index: 2;
-  /* Ensure text is above the background div */
-  /* No text shadow needed for white background */
 }

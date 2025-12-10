@@ -1,21 +1,22 @@
 import React, { useState, useEffect } from 'react';
 import Calendar from 'react-calendar';
 import '../components/Calendar.css'; // Import custom calendar styles
-import { Edit, Trash2, Share2 } from 'lucide-react';
+import { Edit, Trash2, Download } from 'lucide-react';
 import { useHabits } from '../context/HabitContext'; // useHabits import
 import Modal from '../components/Modal';
 import MoodSelector from '../components/MoodSelector';
 import TagSelector from '../components/TagSelector';
 import { Textarea } from '../components/Textarea';
 import { Button } from '../components/Button';
-import ShareModal from '../components/ShareModal';
 
-/**
- * 캘린더 페이지 컴포넌트입니다.
- * 날짜별 기록을 캘린더와 리스트 형태로 보여줍니다.
- */
+import DailyCardModal from '../components/DailyCardModal';
+import ShareModal from '../components/ShareModal';
+import { recommendMovieQuote } from '../utils/geminiApi';
+
+// ... existing imports ...
+
 const CalendarPage = () => {
-  const { entries, deleteEntry, updateEntry, moodColors } = useHabits(); // moodColors는 fallback용으로 유지
+  const { entries, deleteEntry, updateEntry, moodColors } = useHabits();
   const [selectedDate, setSelectedDate] = useState(new Date());
 
   // 수정 모달 관련 상태
@@ -24,35 +25,42 @@ const CalendarPage = () => {
   const [editMood, setEditMood] = useState(null);
   const [editTags, setEditTags] = useState([]);
   const [editContent, setEditContent] = useState('');
-  const [editThemeColor, setEditThemeColor] = useState('#FCD34D'); // 테마 색상 수정 상태
-  const [showColorPicker, setShowColorPicker] = useState(false); // 색상 피커 표시 여부
+  const [editThemeColor, setEditThemeColor] = useState('#FCD34D');
+  const [showColorPicker, setShowColorPicker] = useState(false);
 
   // 삭제 모달 관련 상태
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [deletingEntryId, setDeletingEntryId] = useState(null);
 
-  // 공유 모달 관련 상태
-  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
-  const [sharingEntry, setSharingEntry] = useState(null);
+  // 공유 모달 관련 상태 (일기용)
+  const [shareModalEntry, setShareModalEntry] = useState(null);
+
+  // 하루 공유 카드(이미지) 모달 관련 상태 (일반 기록용)
+  const [isCardModalOpen, setIsCardModalOpen] = useState(false);
+  const [cardEntry, setCardEntry] = useState(null);
+  const [cardMovieQuote, setCardMovieQuote] = useState(null);
 
   const formatDate = (date) => {
+    // ... existing formatDate ...
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   };
 
+  // ... entries filtering ...
   const recordsForSelectedDate = entries.filter(entry => {
     const entryDate = new Date(entry.timestamp);
     return formatDate(entryDate) === formatDate(selectedDate);
-  }).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)); // 시간 순으로 정렬
+  }).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
   const handleEditEntry = (entry) => {
+    // ... existing logic ...
     setEditingEntry(entry);
-    setEditMood(entry.moodId || null); // moodId가 없으면 null (기존 데이터 호환성)
+    setEditMood(entry.moodId || null);
     setEditTags(entry.tags || []);
     setEditContent(entry.content || '');
-    setEditThemeColor(entry.themeColor || '#FCD34D'); // 기존 테마 색상 로드
+    setEditThemeColor(entry.themeColor || '#FCD34D');
     setIsEditing(true);
   };
 
@@ -61,9 +69,22 @@ const CalendarPage = () => {
     setIsDeleteModalOpen(true);
   };
 
-  const handleShareRecord = (entry) => {
-    setSharingEntry(entry);
-    setIsShareModalOpen(true);
+  const handleShareEntry = (entry) => {
+    setShareModalEntry(entry);
+  };
+
+  const handleOpenCard = async (entry) => {
+    setCardEntry(entry);
+    setCardMovieQuote(null); // 초기화
+    setIsCardModalOpen(true);
+
+    try {
+      // 해당 기록의 기분에 맞는 명대사 추천
+      const quote = await recommendMovieQuote(entry.mood);
+      setCardMovieQuote(quote);
+    } catch (error) {
+      console.error("Failed to fetch quote for card:", error);
+    }
   };
 
   const confirmDelete = () => {
@@ -75,6 +96,7 @@ const CalendarPage = () => {
   };
 
   const handleSaveEdit = () => {
+    // ... existing handleSaveEdit logic ...
     if (!editMood) {
       alert('기분을 선택해주세요.');
       return;
@@ -97,13 +119,14 @@ const CalendarPage = () => {
       moodEmoji: currentMood.emoji,
       tags: editTags,
       content: editContent,
-      themeColor: editThemeColor, // 수정된 테마 색상 저장
+      themeColor: editThemeColor,
     });
 
     setIsEditing(false);
     setEditingEntry(null);
   };
 
+  // ... helper functions ...
   const handleToggleTag = (tag) => {
     setEditTags((prevTags) =>
       prevTags.includes(tag) ? prevTags.filter((t) => t !== tag) : [...prevTags, tag]
@@ -118,16 +141,15 @@ const CalendarPage = () => {
 
   return (
     <div className="calendar-page p-4 relative">
+      {/* ... Calendar left side (unchanged) ... */}
       <div className="flex flex-col md:flex-row md:gap-8 h-full">
-        {/* 왼쪽: 캘린더 */}
         <div className="mb-6 md:mb-0 md:w-1/2 lg:w-[450px] md:shrink-0">
-          <div className="p-5 bg-white/70 backdrop-blur-md rounded-[30px] shadow-md border-2 border-white/80 sticky top-4">
+          <div className="p-5 bg-white/70 backdrop-blur-md rounded-[30px] shadow-md border-2 border-white/80 sticky top-4 transition-transform duration-500 hover:scale-[1.02]">
             <Calendar
               onChange={setSelectedDate}
               value={selectedDate}
-              formatDay={(locale, date) => date.getDate()} // 날짜(일)만 표시
+              formatDay={(locale, date) => date.getDate()}
               tileClassName={({ date, view }) => {
-                // 날짜에 기록이 있는지 확인하여 클래스 추가 (텍스트 색상 변경용 - 이번엔 필요 없을 수 있지만 유지)
                 if (view === 'month') {
                   const hasRecord = entries.some(entry => {
                     const entryDate = new Date(entry.timestamp);
@@ -138,6 +160,7 @@ const CalendarPage = () => {
                 return null;
               }}
               tileContent={({ date, view }) => {
+                /* Keep existing tileContent logic */
                 if (view === 'month') {
                   const recordsOnDay = entries.filter(entry => {
                     const entryDate = new Date(entry.timestamp);
@@ -145,7 +168,6 @@ const CalendarPage = () => {
                   });
 
                   if (recordsOnDay.length > 0) {
-                    // 가장 많이 등장한 기분 찾기 (빈도수 계산)
                     const moodCounts = recordsOnDay.reduce((acc, record) => {
                       const moodId = record.moodId || 'etc';
                       acc[moodId] = (acc[moodId] || 0) + 1;
@@ -162,14 +184,15 @@ const CalendarPage = () => {
                       }
                     });
 
-                    // 해당 기분의 색상 가져오기 (없으면 기본값)
-                    // 우선순위: 1. 첫 번째 기록의 themeColor 2. 가장 빈도 높은 기분의 색상
-                    const firstRecord = recordsOnDay[0];
-                    const moodColor = firstRecord.themeColor || moodColors[mostFrequentMoodId] || '#A78BFA';
+                    // 최빈 기분 레코드 찾기
+                    const mostFrequentRecord = recordsOnDay.find(r => (r.moodId || 'etc') === mostFrequentMoodId) || recordsOnDay[0];
+
+                    // 해당 기분의 색상과 이모지 사용
+                    // 우선순위: 1. 최빈 기분 기록의 themeColor 2. 최빈 기분의 기본 색상
+                    const moodColor = mostFrequentRecord.themeColor || moodColors[mostFrequentMoodId] || '#A78BFA';
 
                     return (
                       <>
-                        {/* 동적 색상 테두리 (테마 적용 - 테두리만) */}
                         <div
                           style={{
                             position: 'absolute',
@@ -177,14 +200,13 @@ const CalendarPage = () => {
                             left: '2px',
                             right: '2px',
                             bottom: '2px',
-                            border: `3px solid ${moodColor}`, // 두께 조절 가능
-                            backgroundColor: 'white', // 내부는 흰색
-                            borderRadius: '12px', // 둥근 모서리
+                            border: `3px solid ${moodColor}`,
+                            backgroundColor: 'white',
+                            borderRadius: '12px',
                             zIndex: 0
                           }}
                         />
-                        {/* 이모지 표시 */}
-                        <span className="day-emoji" style={{ position: 'relative', zIndex: 1 }}>{recordsOnDay[0].moodEmoji}</span>
+                        <span className="day-emoji" style={{ position: 'relative', zIndex: 1 }}>{mostFrequentRecord.moodEmoji}</span>
                       </>
                     );
                   }
@@ -206,8 +228,8 @@ const CalendarPage = () => {
                 const colors = ['card-pink', 'card-beige', 'card-yellow', 'card-mint'];
                 const colorClass = colors[index % colors.length];
                 return (
-                  <div key={record.id} className={`p-5 rounded-[20px] shadow-sm flex items-start justify-between ${colorClass}`}>
-                    <div className="flex-1">
+                  <div key={record.id} className={`p-5 rounded-[20px] shadow-sm flex items-start justify-between transition-transform hover:scale-[1.02] ${colorClass}`}>
+                    <div className="flex-1 min-w-0 pr-4"> {/* min-w-0 added for truncate to work */}
                       <div className="flex items-center mb-2">
                         <span className="text-2xl mr-3">{record.moodEmoji}</span>
                         <span className="font-bold text-lg text-[var(--text-main)]">{record.mood}</span>
@@ -223,17 +245,28 @@ const CalendarPage = () => {
                         ))}
                       </div>
                       {record.content && (
-                        <p className="text-[var(--text-main)] mt-2 line-clamp-2">{record.content}</p>
+                        <p className="text-[var(--text-main)] mt-2 truncate text-sm">{record.content}</p> /* Changed to truncate */
                       )}
                     </div>
-                    <div className="flex gap-2 ml-2">
-                      <button onClick={() => handleShareRecord(record)} className="text-gray-400 hover:text-green-500" title="공유하기">
-                        <Share2 size={20} />
+                    <div className="flex gap-2 ml-2 shrink-0">
+                      <button
+                        onClick={() => {
+                          if (record.type === 'diary') {
+                            handleShareEntry(record);
+                          } else {
+                            handleOpenCard(record);
+                          }
+                        }}
+                        className="text-gray-400 hover:text-pink-500 transition-all hover:scale-110 active:scale-95"
+                        title="이미지 저장"
+                      >
+                        <Download size={20} />
                       </button>
-                      <button onClick={() => handleEditEntry(record)} className="text-gray-400 hover:text-blue-500" title="수정하기">
+
+                      <button onClick={() => handleEditEntry(record)} className="text-gray-400 hover:text-blue-500 transition-all hover:scale-110 active:scale-95" title="수정하기">
                         <Edit size={20} />
                       </button>
-                      <button onClick={() => handleDeleteRecord(record.id)} className="text-gray-400 hover:text-red-500" title="삭제하기">
+                      <button onClick={() => handleDeleteRecord(record.id)} className="text-gray-400 hover:text-red-500 transition-all hover:scale-110 active:scale-95" title="삭제하기">
                         <Trash2 size={20} />
                       </button>
                     </div>
@@ -256,7 +289,7 @@ const CalendarPage = () => {
         title="기록 수정"
       >
         <div className="space-y-6">
-          {/* 테마 색상 수정 영역 추가 */}
+          {/* Same Modal Content */}
           <div className="space-y-2">
             <div className="flex justify-between items-center">
               <h3 className="font-semibold">테마 색상</h3>
@@ -341,11 +374,19 @@ const CalendarPage = () => {
         </div>
       </Modal>
 
-      {/* 공유 모달 추가 */}
+      {/* 공유 모달 (ShareModal) */}
       <ShareModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        entry={sharingEntry}
+        isOpen={!!shareModalEntry}
+        onClose={() => setShareModalEntry(null)}
+        entry={shareModalEntry}
+      />
+
+      {/* 하루 공유 카드(이미지) 모달 - 추가 */}
+      <DailyCardModal
+        isOpen={isCardModalOpen}
+        onClose={() => setIsCardModalOpen(false)}
+        entry={cardEntry}
+        movieQuote={cardMovieQuote}
       />
     </div>
   );
