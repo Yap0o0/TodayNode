@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { PencilLine, Edit, Trash2, Sparkles, Share2, Download } from 'lucide-react';
+import { PencilLine, Edit, Trash2, Sparkles, Download } from 'lucide-react';
 import WriteDiaryForm from '../components/WriteDiaryForm';
 import ShareModal from '../components/ShareModal';
 import { useHabits } from '../context/HabitContext'; // useHabits import
@@ -135,9 +135,7 @@ const DiaryPage = () => {
                     <button onClick={() => handleShareEntry(entry)} className="text-gray-400 hover:text-pink-500 transition-all hover:scale-110 active:scale-95" title="이미지 저장">
                       <Download size={20} />
                     </button>
-                    <button onClick={() => handleShareEntry(entry)} className="text-gray-400 hover:text-purple-500 transition-all hover:scale-110 active:scale-95" title="공유하기">
-                      <Share2 size={20} />
-                    </button>
+
                     <button onClick={() => handleEditEntry(entry.id)} className="text-gray-400 hover:text-blue-500 transition-all hover:scale-110 active:scale-95" title="수정">
                       <Edit size={20} />
                     </button>
