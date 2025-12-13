@@ -12,6 +12,33 @@ const DailyCardModal = ({ isOpen, onClose, entry, movieQuote }) => {
     const captureCard = async () => {
         if (!cardRef.current) return null;
 
+        // 이미지 요소 찾기 (앨범 커버)
+        const albumImage = cardRef.current.querySelector('.album-cover');
+        let originalSrc = '';
+
+        if (albumImage) {
+            originalSrc = albumImage.src; // 현재 src 저장
+            // images.weserv.nl - 무료 이미지 프록시 서비스 (CORS 우회)
+            // 원본 URL에서 query string(?t=...)이 있을 수 있으므로 encodeURIComponent로 전체를 감쌉니다.
+            const proxyUrl = `https://images.weserv.nl/?url=${encodeURIComponent(originalSrc)}`;
+
+            try {
+                await new Promise((resolve, reject) => {
+                    albumImage.onload = resolve;
+                    albumImage.onerror = () => {
+                        console.warn('프록시 이미지 로드 실패');
+                        reject();
+                    };
+                    albumImage.src = proxyUrl;
+                });
+            } catch (error) {
+                console.warn('이미지 프록시 로드 실패, 원본으로 시도합니다.', error);
+                albumImage.src = originalSrc; // 실패 시 원복
+                // 원복 후 로딩 대기 (짧게)
+                await new Promise(r => setTimeout(r, 100));
+            }
+        }
+
         try {
             // html-to-image를 사용하여 보이는 그대로 캡처 (SVG foreignObject 방식)
             const blob = await toBlob(cardRef.current, {
@@ -24,9 +51,19 @@ const DailyCardModal = ({ isOpen, onClose, entry, movieQuote }) => {
                     backgroundColor: entry.themeColor ? `${entry.themeColor}40` : '#ffffff', // 25% 투명도 (사용자 요청)
                 }
             });
+
+            // 캡처 후 원본 이미지로 복구
+            if (albumImage && originalSrc) {
+                albumImage.src = originalSrc;
+            }
+
             return blob;
         } catch (error) {
             console.error('캡처 실패:', error);
+            // 에러 시에도 복구
+            if (albumImage && originalSrc) {
+                albumImage.src = originalSrc;
+            }
             return null;
         }
     };
@@ -50,7 +87,7 @@ const DailyCardModal = ({ isOpen, onClose, entry, movieQuote }) => {
             }
         } catch (error) {
             console.error(error);
-            alert('이미지 생성에 실패했습니다.');
+            alert('이미지 생성에 실패했습니다. (CORS 문제 등)');
         } finally {
             setIsProcessing(false);
         }
@@ -177,7 +214,7 @@ const DailyCardModal = ({ isOpen, onClose, entry, movieQuote }) => {
                                         <img
                                             src={(selectedMusic.album?.images?.[0]?.url || selectedMusic.albumArt) + '?t=' + new Date().getTime()}
                                             alt="Album Art"
-                                            className="w-14 h-14 rounded-xl shadow-md object-cover"
+                                            className="w-14 h-14 rounded-xl shadow-md object-cover album-cover"
                                             crossOrigin="anonymous" // CORS 권한 요청
                                         />
                                     ) : (
